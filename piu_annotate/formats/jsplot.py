@@ -1,9 +1,12 @@
+from __future__ import annotations
 import os
 import pickle
 import gzip
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from .chart import ChartStruct
+if TYPE_CHECKING:
+    from piu_annotate.formats.chart import ChartStruct
 
 
 @dataclass
@@ -32,21 +35,20 @@ class HoldArt:
 
 
 class ChartJsStruct:
-    def __init__(self, arrowarts: list[ArrowArt], holdarts: list[HoldArt]):
+    def __init__(self, arrow_arts: list[ArrowArt], hold_arts: list[HoldArt]):
         """ Data structure for chart, for javascript visualization use.
 
             Fields
             - ArrowArts
             - HoldArts
         """
-        self.arrowarts = arrowarts
-        self.holdarts = holdarts
+        self.arrow_arts = arrow_arts
+        self.hold_arts = hold_arts
         pass
 
-    @classmethod
+    @staticmethod
     def from_chartstruct(cs: ChartStruct):
-        # return ChartJsStruct(*pcs.get_arrow_hold_arts())
-        return
+        return ChartJsStruct(*cs.get_arrow_hold_arts())
     
     def to_file(self):
         """ Save to file: pkl.gz, for """

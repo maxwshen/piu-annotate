@@ -3,6 +3,7 @@ from tqdm import tqdm
 from loguru import logger
 
 from .piucenterdf import PiuCenterDataFrame
+from piu_annotate.formats.jsplot import ArrowArt, HoldArt
 
 
 class ChartStruct:
@@ -92,3 +93,46 @@ class ChartStruct:
             assert set(lineah).issubset(line_w_active_holds_symbols)
             assert set(limb_annot).issubset(limb_symbols)
         return
+
+    def get_arrow_hold_arts(self) -> tuple[list[ArrowArt], list[HoldArt]]:
+        arrow_arts = []
+        hold_arts = []
+        is_active_symbol = lambda sym: sym in list('1234')
+        get_limb = lambda limbs, idx: limbs[idx] if len(limbs) > 0 else '?'
+        active_holds = {}   # arrowpos: (time start, limb)
+        for _, row in self.df.iterrows():
+            line = row['Line with active holds']
+            limb_annot = row['Limb annotation']
+            time = row['Time']
+
+            n_active_symbols_seen = 0
+            for arrow_pos, sym in enumerate(line[1:]):
+                if is_active_symbol(sym):
+                    limb = get_limb(limb_annot, n_active_symbols_seen)
+
+                    if sym == '1':
+                        arrow_arts.append(ArrowArt(arrow_pos, time, limb))
+                    if sym == '2':
+                        # add to active holds
+                        assert arrow_pos not in active_holds
+                        active_holds[arrow_pos] = (time, limb)
+                    if sym == '4':
+                        # if limb changes, pop active hold and add new hold
+                        active_limb = active_holds[arrow_pos][1]
+                        if limb != active_limb:
+                            start_time, start_limb = active_holds.pop(arrow_pos)
+                            hold_arts.append(
+                                HoldArt(arrow_pos, start_time, time, start_limb)
+                            )
+                            active_holds[arrow_pos] = (time, limb)
+                    if sym == '3':
+                        # pop from active holds
+                        start_time, start_limb = active_holds.pop(arrow_pos)
+                        hold_arts.append(
+                            HoldArt(arrow_pos, start_time, time, limb)
+                        )
+
+                    n_active_symbols_seen += 1
+        return arrow_arts, hold_arts
+
+    

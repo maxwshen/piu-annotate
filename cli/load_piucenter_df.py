@@ -3,11 +3,13 @@ from hackerargs import args
 
 from piu_annotate.formats.piucenterdf import PiuCenterDataFrame
 from piu_annotate.formats.chart import ChartStruct
-
+from piu_annotate.formats.jsplot import ChartJsStruct
 
 def main():
     pc_df = PiuCenterDataFrame(args['file'])
     cs = ChartStruct.from_piucenterdataframe(pc_df)
+
+    cjss = ChartJsStruct.from_chartstruct(cs)
 
     import code; code.interact(local=dict(globals(), **locals()))
     return
