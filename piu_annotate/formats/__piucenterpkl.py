@@ -1,4 +1,5 @@
 import pickle
+from jsplot import ArrowArt, HoldArt
 
 
 def is_js_lists(inp: any) -> bool:
@@ -25,7 +26,7 @@ def js_lists_to_dict(ll: list[list]) -> dict:
     return d
 
 
-class PiuCenterStruct:
+class PiuCenterPickle:
     def __init__(self, pkl_file: str):
         """ Loads piucenter data struct from pickle file. """
         with open(pkl_file, 'rb') as f:
@@ -37,7 +38,23 @@ class PiuCenterStruct:
     @classmethod
     def from_s3(filename: str):
         """ Alternate constructor: download from s3"""
-        return    
+        raise NotImplementedError()
 
     def get_n_sections(self):
         return len(self.chart_details_struct) - 1
+
+    def get_arrow_hold_arts(self) -> tuple[list[ArrowArt], list[HoldArt]]:
+        """ Get ArrowArts and HoldArts for entire chart, cat over sections.
+            Merges `long_holds` that span sections.
+        """
+        arrow_arts = []
+        hold_arts = []
+        holds_span_sections = []
+        for sec in self.chart_details_lod[1:]:
+            for tpl in sec['arrows']:
+                arrow_arts.append(ArrowArt.from_piucenter_tpl(tpl))
+            for tpl in sec['holds']:
+                ha = HoldArt.from_piucenter_tpl(tpl)
+                hold_arts.append(ha)
+        return arrow_arts, hold_arts
+
