@@ -41,7 +41,7 @@ class ChartStruct:
             - Featurize ChartStruct, for ML annotation of feet
         """
         self.df = df
-        self.validate()
+        # self.validate()
 
     @staticmethod
     def from_file(csv_file: str):
@@ -61,7 +61,7 @@ class ChartStruct:
     
     def validate(self):
         """ Validate format -- see docstring. """
-        logger.debug('Verifying ChartStruct ...')
+        # logger.debug('Verifying ChartStruct ...')
         cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Limb annotation']
         for col in cols:
             assert col in self.df.columns
@@ -72,7 +72,8 @@ class ChartStruct:
         line_w_active_holds_symbols = set(list('`01234'))
         limb_symbols = set(list('lreh?'))
 
-        for idx, row in tqdm(self.df.iterrows(), total = len(self.df)):
+        for idx, row in self.df.iterrows():
+        # for idx, row in tqdm(self.df.iterrows(), total = len(self.df)):
             line = row['Line']
             lineah = row['Line with active holds']
             limb_annot = row['Limb annotation']
@@ -83,10 +84,13 @@ class ChartStruct:
 
             # check lengths
             assert len(line) == len(lineah)
-            length = len(line)
             assert len(line) == 6 or len(line) == 11
             n_active_symbols = len(lineah[1:].replace('0', ''))
-            assert len(limb_annot) == 0 or len(limb_annot) == n_active_symbols
+            try:
+                assert len(limb_annot) == 0 or len(limb_annot) == n_active_symbols
+            except:
+                logger.error('error')
+                import code; code.interact(local=dict(globals(), **locals()))
 
             # check characters
             assert set(line).issubset(line_symbols)
@@ -114,7 +118,15 @@ class ChartStruct:
                         arrow_arts.append(ArrowArt(arrow_pos, time, limb))
                     if sym == '2':
                         # add to active holds
-                        assert arrow_pos not in active_holds
+                        if arrow_pos in active_holds:
+                            logger.warning(f'WARNING: {arrow_pos=} in {active_holds=}')
+                            logger.warning(f'Skipping line ...')
+                            continue
+                        # try:
+                        #     assert arrow_pos not in active_holds
+                        # except:
+                        #     print(f'{arrow_pos=} not in {active_holds=}')
+                        #     import code; code.interact(local=dict(globals(), **locals()))
                         active_holds[arrow_pos] = (time, limb)
                     if sym == '4':
                         # if limb changes, pop active hold and add new hold

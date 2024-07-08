@@ -19,12 +19,13 @@ class PiuCenterDataFrame:
             by parsing columns
             {Left foot / Right foot / Left hand / Right hand} {1/2/3/4}
             
-            Concatenated string of l (left foot), r (right foot),
+            Limb annotation format: concatenated string of
+            l (left foot), r (right foot),
             e (either foot), h (either hand), ? (unknown).
             Length must be:
-                = Number of non-0 symbols in `Line with active holds`:
-                    limb per symbol in same order.
-                = 0: (blank) equivalent to ? * (n. non-0 symbols)
+            = Number of non-0 symbols in `Line with active holds`:
+                limb per symbol in same order.
+            = 0: (blank) equivalent to ? * (n. non-0 symbols)
         """
         panel_to_idx = {
             'p1,1': 0,
@@ -44,11 +45,14 @@ class PiuCenterDataFrame:
         actions = ['1', '2', '3', '4']
         limb_cols = [f'{limb} {action}' for limb in limbs for action in actions]
         limb_annots = []
-        for _, row in tqdm(df.iterrows(), total = len(df)):
-            idx_s_tuples = []
+        # for _, row in tqdm(df.iterrows(), total = len(df)):
+        for _, row in df.iterrows():
+            lineah = row['Line with active holds'][1:]
+            idx_to_symbol = {i: '?' for i, note in enumerate(lineah) if note != '0'}
             for limb_col in limb_cols:
-                if row[limb_col] in panels:
-                    panel = row[limb_col]
+                if type(row[limb_col]) != str:
+                    continue
+                for panel in row[limb_col].split(';'):
                     line_idx = panel_to_idx[panel]
 
                     if 'Left foot' in limb_col:
@@ -58,12 +62,9 @@ class PiuCenterDataFrame:
                     if 'hand' in limb_col:
                         s = 'h'
                     
-                    idx_s_tuples.append((line_idx, s))
+                    idx_to_symbol[line_idx] = s
             
-            if len(idx_s_tuples) > 0:
-                idx_s_tuples = sorted(idx_s_tuples)
-                limb_annot = ''.join(t[1] for t in idx_s_tuples)
-            else:
-                limb_annot = ''
+            limb_annot = ''.join(list(idx_to_symbol.values()))
+
             limb_annots.append(limb_annot)
         return limb_annots
