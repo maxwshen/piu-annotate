@@ -3,6 +3,8 @@ from tqdm import tqdm
 from loguru import logger
 
 from .piucenterdf import PiuCenterDataFrame
+from .sscfile import StepChartSSC
+from .ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 from piu_annotate.formats.jsplot import ArrowArt, HoldArt
 
 
@@ -56,8 +58,9 @@ class ChartStruct:
         return ChartStruct(dfs)
     
     @classmethod
-    def from_ssc(ssc_file: str):
-        raise NotImplementedError
+    def from_stepchart_ssc(stepchart_ssc: StepChartSSC):
+        df = stepchart_ssc_to_chartstruct(stepchart_ssc)
+        return ChartStruct(df)
     
     def validate(self):
         """ Validate format -- see docstring. """
