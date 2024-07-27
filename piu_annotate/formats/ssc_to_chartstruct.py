@@ -18,7 +18,6 @@ WARP_RELEASE_TIME = Fraction(1 / 1000)
 
 def stepchart_ssc_to_chartstruct(
     stepchart: StepchartSSC,
-    debug: bool = False,
 ) -> tuple[pd.DataFrame, int]:
     """ Builds df to create ChartStruct object.
         df has one row per "line" and 
@@ -111,7 +110,6 @@ def stepchart_ssc_to_chartstruct(
         time += stops.get(beat, 0)
 
     df = pd.DataFrame(dd)
-    # logger.debug(f'Found {num_bad_lines=}')
     return df, num_bad_lines
 
 

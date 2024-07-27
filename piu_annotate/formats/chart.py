@@ -3,7 +3,7 @@ from tqdm import tqdm
 from loguru import logger
 
 from .piucenterdf import PiuCenterDataFrame
-from .sscfile import StepChartSSC
+from .sscfile import StepchartSSC
 from .ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 from piu_annotate.formats.jsplot import ArrowArt, HoldArt
 
@@ -57,9 +57,11 @@ class ChartStruct:
         dfs['Limb annotation'] = pc_df.get_limb_annotations()
         return ChartStruct(dfs)
     
-    @classmethod
-    def from_stepchart_ssc(stepchart_ssc: StepChartSSC):
-        df = stepchart_ssc_to_chartstruct(stepchart_ssc)
+    @staticmethod
+    def from_stepchart_ssc(stepchart_ssc: StepchartSSC):
+        df, num_bad_lines = stepchart_ssc_to_chartstruct(stepchart_ssc)
+        df['Line'] = [f'`{line}' for line in df['Line']]
+        df['Line with active holds'] = [f'`{line}' for line in df['Line with active holds']]
         return ChartStruct(df)
     
     def validate(self):
@@ -119,19 +121,20 @@ class ChartStruct:
 
                     if sym == '1':
                         arrow_arts.append(ArrowArt(arrow_pos, time, limb))
-                    if sym == '2':
+                    elif sym == '2':
                         # add to active holds
-                        if arrow_pos in active_holds:
+                        if arrow_pos not in active_holds:
+                            active_holds[arrow_pos] = (time, limb)
+                        else:
                             logger.warning(f'WARNING: {arrow_pos=} in {active_holds=}')
-                            logger.warning(f'Skipping line ...')
+                            # logger.warning(f'Skipping line ...')
                             continue
                         # try:
                         #     assert arrow_pos not in active_holds
                         # except:
                         #     print(f'{arrow_pos=} not in {active_holds=}')
                         #     import code; code.interact(local=dict(globals(), **locals()))
-                        active_holds[arrow_pos] = (time, limb)
-                    if sym == '4':
+                    elif sym == '4':
                         # if limb changes, pop active hold and add new hold
                         active_limb = active_holds[arrow_pos][1]
                         if limb != active_limb:
@@ -140,7 +143,7 @@ class ChartStruct:
                                 HoldArt(arrow_pos, start_time, time, start_limb)
                             )
                             active_holds[arrow_pos] = (time, limb)
-                    if sym == '3':
+                    elif sym == '3':
                         # pop from active holds
                         start_time, start_limb = active_holds.pop(arrow_pos)
                         hold_arts.append(
