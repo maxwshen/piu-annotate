@@ -17,7 +17,8 @@ WARP_RELEASE_TIME = Fraction(1 / 1000)
 
 
 def stepchart_ssc_to_chartstruct(
-    stepchart: StepchartSSC
+    stepchart: StepchartSSC,
+    debug: bool = False,
 ) -> tuple[pd.DataFrame, int]:
     """ Builds df to create ChartStruct object.
         df has one row per "line" and 
@@ -54,6 +55,7 @@ def stepchart_ssc_to_chartstruct(
             Track active holds with 4.
         """
         time += delays.get(beat, 0)
+        comment = ''
 
         if notelines.has_notes(line):
             # Add active holds into line as 4
@@ -61,7 +63,9 @@ def stepchart_ssc_to_chartstruct(
             try:
                 aug_line = notelines.add_active_holds(line, active_holds)
             except:
+                aug_line = line
                 bad_line = True
+                comment = 'Tried placing 4 onto 1'
 
             active_panel_to_action = notelines.panel_to_action(line)
             bad_hold_releases = []
@@ -71,17 +75,23 @@ def stepchart_ssc_to_chartstruct(
                     # Tried to release hold that doesn't exist
                     pidx = notelines.panel_to_idx[p]
                     bad_hold_releases.append(pidx)
-                    bad_line = True
+                    # bad_line = True
+                    # comment = 'Tried releasing non-existent hold'
+                    line = line[:pidx] + '0' + line[pidx+1:]
+                    aug_line = aug_line[:pidx] + '0' + aug_line[pidx+1:]
+
 
             d = {
                 'Time': time,
                 'Beat': beat,
-                'Line': line if not bad_line else empty_line,
-                'Line with active holds': aug_line if not bad_line else empty_line,
+                'Line': line,
+                'Line with active holds': aug_line,
                 'Limb annotation': '',
+                'Comment': comment,
             }
-            for k, v in d.items():
-                dd[k].append(v)
+            if set(line) != set(['0']):
+                for k, v in d.items():
+                    dd[k].append(v)
 
             # Update active holds
             if not bad_line:
@@ -152,8 +162,8 @@ class BeatToLines:
         beat = 0
 
         for measure_num, measure in enumerate(measures):
-            lines = measure.split('\n\n')
-            lines = [line for line in lines if '//' not in line]
+            lines = measure.split('\n')
+            lines = [line for line in lines if '//' not in line and line != '']
             num_subbeats = len(lines)
 
             for lidx, line in enumerate(lines):
