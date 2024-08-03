@@ -9,56 +9,9 @@ from tqdm import tqdm
 import pandas as pd
 from collections import defaultdict
 
+from piu_annotate.crawl import crawl_sscs
 from piu_annotate.formats.sscfile import SongSSC, StepchartSSC
 from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
-
-SKIP_PACKS = ['INFINITY']
-
-
-def crawl_sscs(base_simfiles_folder: str) -> list[SongSSC]:
-    """ Crawls `base_simfiles_folder` assuming structure:
-        base_simfiles_folder / <pack_folder> / < song folder > / song.ssc.
-        Returns list of SongSSC objects.
-    """
-    ssc_files = []
-    packs = []
-
-    for dirpath, _, files in os.walk(base_simfiles_folder):
-        subdir = dirpath.replace(base_simfiles_folder, '')
-        pack = subdir.split(os.sep)[0].split(' - ')[-1]
-        level = subdir.count(os.sep)
-
-        if pack in SKIP_PACKS:
-            continue
-
-        if level == 1:
-            for file in files:
-                if file.endswith('.ssc'):
-                    ssc_files.append(os.path.join(dirpath, file))
-                    packs.append(pack)
-    logger.info(f'Found {len(ssc_files)} .ssc files in {base_simfiles_folder}')
-    logger.info(f'Found packs: {sorted(list(set(packs)))}')
-
-    valid = []
-    invalid = []
-    song_sscs = []
-    valid_song_sscs = []
-    for ssc_file, pack in tqdm(zip(ssc_files, packs), total = len(ssc_files)):
-        song_ssc = SongSSC(ssc_file, pack)
-        song_sscs.append(song_ssc)
-
-        if song_ssc.validate():
-            valid.append(ssc_file)
-            valid_song_sscs.append(song_ssc)
-        else:
-            invalid.append(ssc_file)
-
-    logger.success(f'Found {len(valid)} valid song ssc files')
-    if len(invalid):
-        logger.error(f'Found {len(invalid)} invalid song ssc files')
-    else:
-        logger.info(f'Found {len(invalid)} invalid song ssc files')
-    return valid_song_sscs
 
 
 def get_num_bad_lines(stepchart: StepchartSSC) -> int:
@@ -69,9 +22,10 @@ def get_num_bad_lines(stepchart: StepchartSSC) -> int:
 def main():
     simfiles_folder = args['simfiles_folder']
 
-    logger.info(f'Skipping packs: {SKIP_PACKS}')
+    skip_packs = ['INFINITY']
+    logger.info(f'Skipping packs: {skip_packs}')
 
-    song_sscs = crawl_sscs(simfiles_folder)
+    song_sscs = crawl_sscs(simfiles_folder, skip_packs = skip_packs)
 
     # get stepcharts
     stepcharts: list[StepchartSSC] = []
@@ -130,12 +84,13 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description = """
-            Crawls PIU-Simfiles folder
+            Crawls PIU-Simfiles folder for .ssc files -> StepChartSSC objects ->
+            ChartStruct objects.
         """
     )
     parser.add_argument(
         '--simfiles_folder', 
-        default = '/home/maxwshen/PIU-Simfiles/'
+        default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/'
     )
     args.parse_args(parser)
     main()

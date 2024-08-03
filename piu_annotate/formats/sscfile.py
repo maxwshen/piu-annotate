@@ -84,7 +84,19 @@ class StepchartSSC(UserDict):
         return
 
     def __repr__(self) -> str:
-        return '\n'.join(f'{k}: {v[:15].replace("\n", "")}' for k, v in self.data.items())
+        return '\n'.join(f'{k}: {v.split("\n")[0]}' for k, v in self.data.items())
+
+    def __eq__(self, other) -> bool:
+        return hash(self) == hash(other)
+
+    def __hash__(self) -> int:
+        return hash((
+            self.data['TITLE'],
+            self.data['STEPSTYPE'],
+            self.data['SONGTYPE'],
+            self.data['METER'],
+            self.data['NOTES']
+        ))
 
     def shortname(self) -> str:
         shortname = '_'.join([
@@ -107,25 +119,10 @@ class StepchartSSC(UserDict):
     """
         Attributes
     """
-    def is_nonstandard(self) -> bool:
-        return any([
-            self.is_ucs(),
-            self.is_quest(),
-            self.is_hidden(),
-            self.is_infinity(),
-            self.is_train(),
-            self.is_coop(),
-            self.has_99_meter(),
-            not self.has_4_4_timesig(),
-            self.has_nonstandard_notes(),
-            not self.standard_stepstype(),
-            not self.standard_songtype(),
-        ])
-
-    def describe(self) -> dict[str, any]:
-        d = {k: v[:15].replace('\n', ';') for k, v in self.data.items()}
-        d.update({
-            'nonstandard': self.is_nonstandard(),
+    def get_nonstandard_attributes(self) -> dict[str, bool]:
+        return {
+            'nonstandard notes': self.has_nonstandard_notes(),
+            'stepf2 notes': self.has_stepf2_notes(),
             'ucs': self.is_ucs(),
             'quest': self.is_quest(),
             'hidden': self.is_hidden(),
@@ -134,10 +131,24 @@ class StepchartSSC(UserDict):
             'coop': self.is_coop(),
             'meter 99': self.has_99_meter(),
             'not 4/4': not self.has_4_4_timesig(),
-            'nonstandard notes': self.has_nonstandard_notes(),
-            'standard stepstype': self.standard_stepstype(),
-            'standard songtype': self.standard_songtype(),
-        })
+            'nonstandard steptype': not self.standard_stepstype(),
+            'nonstandard songtype': not self.standard_songtype(),
+        }
+
+    def is_nonstandard_reason(self) -> str:
+        """ If nonstandard, get reason """
+        for reason, nonstandard in self.get_nonstandard_attributes().items():
+            if nonstandard:
+                return reason
+        return ''
+
+    def is_nonstandard(self) -> bool:
+        return any(self.get_nonstandard_attributes().values())
+
+    def describe(self) -> dict[str, any]:
+        d = {k: v[:50].replace('\n', ' ') for k, v in self.data.items()}
+        d['nonstandard'] = self.is_nonstandard()
+        d.update(self.get_nonstandard_attributes())
         return d
 
     def has_99_meter(self) -> bool:
@@ -157,6 +168,11 @@ class StepchartSSC(UserDict):
             if ok_char in note_set:
                 note_set.remove(ok_char)
         return bool(len(note_set))
+
+    def has_stepf2_notes(self) -> bool:
+        notes = self.data['NOTES'].replace('\n', '').replace(',', '')
+        note_set = set(notes)
+        return any(c in note_set for c in ['{', '}'])
 
     def is_quest(self) -> bool:
         return 'QUEST' in self.data['DESCRIPTION'].upper()

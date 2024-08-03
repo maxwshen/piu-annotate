@@ -107,13 +107,13 @@ def add_active_holds(
 
 @functools.lru_cache(maxsize = None)
 def parse_line(line: str) -> str:
-    """
-    https://github.com/rhythmlunatic/stepmania/wiki/Note-Types#stepf2-notes
-    https://github.com/stepmania/stepmania/wiki/Note-Types
-    Handle lines like:
-        0000F00000
-        00{2|n|1|0}0000000    
-        0000{M|n|1|0} -> 0
+    """ Parse notes in stepmania [0/1/2/3] and stepf2 {2|n|1|0} format.
+        https://github.com/rhythmlunatic/stepmania/wiki/Note-Types#stepf2-notes
+        https://github.com/stepmania/stepmania/wiki/Note-Types
+        Handle lines like:
+            0000F00000
+            00{2|n|1|0}0000000    
+            0000{M|n|1|0} -> 0
     """
     ws = re.split('{|}', line)
     nl = ''
@@ -121,14 +121,11 @@ def parse_line(line: str) -> str:
         if '|' not in w:
             nl += w
         else:
-            [note_type, attribute, fake_flag, x_offset] = w.split('|')
+            [note_type, attribute, fake_flag, reserved_flag] = w.split('|')
             if fake_flag == '1':
                 nl += '0'
             else:
-                if attribute in ['v', 'h']:
-                    nl += '0'
-                else:
-                    nl += note_type
+                nl += note_type
     line = nl
 
     # F is fake note
@@ -136,15 +133,15 @@ def parse_line(line: str) -> str:
         'F': '0',
         'M': '0',
         'K': '0',
-        'L': '0',
         'V': '0',
         'v': '0',
-        's': '0',
         'S': '0',
+        's': '0',
         'E': '0',
         'I': '1',
         '4': '2',
         '6': '2',
+        'L': '3',
     }
     line = line.translate(str.maketrans(replace))
     return line
