@@ -20,6 +20,9 @@ class ArrowEclipseChartInfo:
         """
         self.data = data
 
+    def matches_song_name(self, sc: StepchartSSC) -> bool:
+        return self.data['song']['name'] == sc['TITLE']
+
     def matches_stepchart_ssc(self, sc: StepchartSSC) -> bool:
         return all([
             self.data['song']['name'] == sc['TITLE'],
@@ -27,18 +30,42 @@ class ArrowEclipseChartInfo:
             self.match_stepstype(sc['STEPSTYPE']),
             int(self.data['level']) == int(sc['METER']),
         ])
-    
+
+    def matches_stepchart_ssc_partial(self, sc: StepchartSSC) -> bool:
+        """ Matches on songtype (shortcut/arcade/remix),
+            stepstype (double/single), and level.
+            Does not match on song title.
+        """
+        return all([
+            self.data['song']['type'].lower() == sc['SONGTYPE'].lower(),
+            self.match_stepstype(sc['STEPSTYPE']),
+            int(self.data['level']) == int(sc['METER']),
+        ])
+
     def match_stepstype(self, ssc_stepstype: str) -> bool:
         """ ArrowEclipse type: {'Single': 2356, 'Double': 1490, 'CoOp': 126}
             ssc_stepstype
             {'pump-single': 7694, 'pump-double': 5206, 'pump-halfdouble': 897, 'pump-routine': 216, 'pump-couple': 136}
         """
         mapping = {
-            'Single': 'pump-single',
-            'Double': 'pump-double',
-            'CoOp': 'pump-couple',
+            'pump-single': 'Single',
+            'pump-double': 'Double',
+            'pump-halfdouble': 'Double',
+            'pump-couple': 'CoOp',
         }
-        return mapping[self.data['type']] == ssc_stepstype
+        return self.data['type'] == mapping.get(ssc_stepstype, ssc_stepstype)
+
+    def is_coop(self) -> bool:
+        return self.data['type'] == 'CoOp'
+
+    def level(self) -> int:
+        return self.data['level']
+
+    def is_singles(self) -> int:
+        return self.data['type'] == 'Single'
+
+    def is_doubles(self) -> int:
+        return self.data['type'] == 'Double'
 
     def __repr__(self) -> str:
         return '\n'.join(f'{k}: {v}' for k, v in self.data.items())
@@ -69,6 +96,6 @@ class ArrowEclipseStepchartListJson:
         with open(json_file, 'r') as f:
             self.d = json.load(f)
         self.charts = [ArrowEclipseChartInfo(rd) for rd in self.d['results']]
-        
+
     def __len__(self) -> int:
         return len(self.charts)

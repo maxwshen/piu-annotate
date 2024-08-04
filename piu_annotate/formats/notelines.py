@@ -85,29 +85,21 @@ def frac_two_arrows_bracketable(lines: list[str]) -> float:
     return num_bracketable / len(two_arrow_lines)
 
 
-def add_active_holds(
-    line: str, 
-    active_holds: set[str], 
-) -> str:
-    """
-        Add active holds into line as '4'
-        01000 -> 01040
-    """
+def add_active_holds(line: str, active_holds: set[str]) -> str:
+    """ Add active holds into line as '4'. 01000 -> 01040 """
     aug_line = list(line)
     for panel in active_holds:
         idx = panel_to_idx[panel]
         if aug_line[idx] == '0':
           aug_line[idx] = '4'
-        elif aug_line[idx] == '1':
-            # print('Error: Tried to place active hold 4 onto 1')
-            # import code; code.interact(local=dict(globals(), **locals()))
-            raise Exception('Error: Tried to place active hold 4 onto 1')
+        elif aug_line[idx] in ['1', '2']:
+            raise Exception('Error: Tried to place active hold 4 onto 1 or 2')
     return ''.join(aug_line)
 
 
-@functools.lru_cache(maxsize = None)
 def parse_line(line: str) -> str:
     """ Parse notes in stepmania [0/1/2/3] and stepf2 {2|n|1|0} format.
+        Return line in standardized format using note types 0/1/2/3.
         https://github.com/rhythmlunatic/stepmania/wiki/Note-Types#stepf2-notes
         https://github.com/stepmania/stepmania/wiki/Note-Types
         Handle lines like:

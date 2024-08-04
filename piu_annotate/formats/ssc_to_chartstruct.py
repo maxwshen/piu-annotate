@@ -18,10 +18,16 @@ WARP_RELEASE_TIME = Fraction(1 / 1000)
 
 def stepchart_ssc_to_chartstruct(
     stepchart: StepchartSSC,
-) -> tuple[pd.DataFrame, int]:
+) -> tuple[pd.DataFrame | None, str]:
     """ Builds df to create ChartStruct object.
         df has one row per "line" and 
-        cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Limb annotation']
+        cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Limb annotation'].
+
+        Output
+        ------
+        result: pd.DataFrame | None
+            Returns None if failed
+        message: str
     """
     assert stepchart.has_4_4_timesig()
 
@@ -64,7 +70,7 @@ def stepchart_ssc_to_chartstruct(
             except:
                 aug_line = line
                 bad_line = True
-                comment = 'Tried placing 4 onto 1'
+                comment = 'Tried placing 4 onto 1 or 2'
 
             active_panel_to_action = notelines.panel_to_action(line)
             bad_hold_releases = []
@@ -106,11 +112,14 @@ def stepchart_ssc_to_chartstruct(
                 num_bad_lines += 1
 
         bi = beat_to_increments[beat]
-        time, bpm, beat_to_bpm = update_time(time, beat, bi, bpm, beat_to_bpm)
+        try:
+            time, bpm, beat_to_bpm = update_time(time, beat, bi, bpm, beat_to_bpm)
+        except:
+            return None, 'Failed to update time'
         time += stops.get(beat, 0)
 
     df = pd.DataFrame(dd)
-    return df, num_bad_lines
+    return df, f'{num_bad_lines=}'
 
 
 class Warps:
@@ -480,14 +489,12 @@ def update_time(
         # For each bpm update, update beat, time (using bpm+beat), and bpm.
         bi = next_bpm_update_beat - beat
         if bi < 0:
-            print('Error: Negative beat increment')
-            raise Exception('Error: Time decreased')
+            raise Exception('Error: Negative beat increment')
         time += bi * (60 / bpm)
         beat += bi
         if beat >= beat_to_bpm.next_bpm_update_beat():
             bpm = beat_to_bpm.pop()
             next_bpm_update_beat = beat_to_bpm.next_bpm_update_beat()
-        assert bpm is not None, 'Error: Failed to set bpm'
 
     # No more bpm updates before next note line.
     # Update time. No need to update beat, bpm.
@@ -497,7 +504,6 @@ def update_time(
     assert bpm is not None, 'Error: Failed to set bpm'
     # print(beat, bpm)
     if time < orig_time:
-        print('Error: Time decreased')
         raise Exception('ERROR: Time decreased')
     return time, bpm, beat_to_bpm
 

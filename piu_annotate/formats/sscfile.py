@@ -1,7 +1,10 @@
 import os
+import functools
 from collections import UserDict
 from loguru import logger
 from pathlib import Path
+
+from piu_annotate.formats import notelines
 
 
 def parse_ssc_to_dict(string: str) -> dict[str, str]:
@@ -121,12 +124,10 @@ class StepchartSSC(UserDict):
     """
     def get_nonstandard_attributes(self) -> dict[str, bool]:
         return {
-            'nonstandard notes': self.has_nonstandard_notes(),
-            'stepf2 notes': self.has_stepf2_notes(),
+            'has notelines failing grammar': self.has_notelines_failing_grammar(),
             'ucs': self.is_ucs(),
             'quest': self.is_quest(),
             'hidden': self.is_hidden(),
-            'infinity': self.is_infinity(),
             'train': self.is_train(),
             'coop': self.is_coop(),
             'meter 99': self.has_99_meter(),
@@ -160,6 +161,13 @@ class StepchartSSC(UserDict):
     def is_coop(self) -> bool:
         return 'COOP' in self.data['DESCRIPTION'].upper()
 
+    def is_pro(self) -> bool:
+        return 'PRO' in self.data['DESCRIPTION'].upper()
+
+    def is_performance(self) -> bool:
+        items = ['SP', 'DP']
+        return any(item in self.data['DESCRIPTION'].upper() for item in items)
+
     def has_nonstandard_notes(self) -> bool:
         """ Has notes other than 0, 1, 2, 3 """
         notes = self.data['NOTES'].replace('\n', '').replace(',', '')
@@ -173,6 +181,19 @@ class StepchartSSC(UserDict):
         notes = self.data['NOTES'].replace('\n', '').replace(',', '')
         note_set = set(notes)
         return any(c in note_set for c in ['{', '}'])
+
+    @functools.cache
+    def has_notelines_failing_grammar(self) -> bool:
+        measures = self.data['NOTES'].split(',')
+        ok_chars = set(list('0123'))
+        for measure in measures:
+            lines = [line for line in measure.strip().split('\n')
+                     if '//' not in line and line != '']
+            for line in lines:
+                parsed_line = notelines.parse_line(line)
+                if any(x not in ok_chars for x in parsed_line):
+                    return True
+        return False            
 
     def is_quest(self) -> bool:
         return 'QUEST' in self.data['DESCRIPTION'].upper()
