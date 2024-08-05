@@ -28,7 +28,7 @@ def crawl_sscs(
 
         if level == 1:
             for file in files:
-                if file.endswith('.ssc'):
+                if file.lower().endswith('.ssc'):
                     ssc_files.append(os.path.join(dirpath, file))
                     packs.append(pack)
     logger.info(f'Found {len(ssc_files)} .ssc files in {base_simfiles_folder}')

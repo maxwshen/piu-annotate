@@ -16,10 +16,6 @@ from piu_annotate.crawl import crawl_stepcharts
 from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 
 
-def matches(ae_ci: ArrowEclipseChartInfo, stepcharts: list[StepchartSSC]) -> bool:
-    return any(ae_ci.matches_stepchart_ssc(sc) for sc in stepcharts)
-
-
 def fuzzy_match_song_name(query: str, targets: list[str]) -> str | None:
     close_matches = difflib.get_close_matches(query, targets)
     if len(close_matches) > 0:
@@ -51,7 +47,7 @@ def match_aeci_to_ssc(
     stepcharts = song_name_to_stepcharts[matched_song_name]
     matched_ssc = [sc for sc in stepcharts if ae_ci.matches_stepchart_ssc_partial(sc)]
     # if len(matched_ssc) == 2:
-        # import code; code.interact(local=dict(globals(), **locals()))
+    #     import code; code.interact(local=dict(globals(), **locals()))
     return matched_ssc, len(matched_ssc)
 
 
@@ -64,7 +60,9 @@ def main():
     ae_json = args['charts_list_json']
     simfiles_folder = args['simfiles_folder']
 
-    # Load phoenix-accessible stepcharts
+    """
+        Load phoenix-accessible stepcharts
+    """
     charts_ae = ArrowEclipseStepchartListJson(ae_json).charts
 
     # Filter co-op and too low level stepcharts
@@ -77,7 +75,9 @@ def main():
     charts_ae = [c for c in charts_ae if not filt_ae(c)]
     logger.info(f'Loaded {len(charts_ae)} filtered stepcharts from {ae_json}')
 
-    # Load .ssc
+    """
+        Load .ssc
+    """
     skip_packs = ['INFINITY', 'MOBILE EDITION']
     logger.info(f'Skipping packs: {skip_packs}')
     stepcharts = crawl_stepcharts(simfiles_folder, skip_packs = skip_packs)
@@ -92,6 +92,7 @@ def main():
             sc.is_train(),
             sc.is_pro(),
             sc.is_performance(),
+            sc.is_jump_edition(),
         ])
     stepcharts = [sc for sc in stepcharts if not filt(sc)]
 
@@ -122,7 +123,8 @@ def main():
     logger.success(f'Found {len(standard_stepcharts)} standard stepcharts')
 
     # get reasons for nonstandard charts
-    nonstandard_reasons = [sc.is_nonstandard_reason() for sc in matched_sscs if sc.is_nonstandard()]
+    nonstandard_reasons = [sc.is_nonstandard_reason() for sc in matched_sscs
+                           if sc.is_nonstandard()]
     for k, v in Counter(nonstandard_reasons).items():
         logger.info(f'{k}: {v}')
 
@@ -149,8 +151,8 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description = """
-            Check how many charts in `charts_list_json` are covered by
-            .ssc in `simfiles_folder`.
+            Check how many charts in `charts_list_json` (officially accessible
+            stepcharts) are covered by .ssc files in `simfiles_folder`.
         """
     )
     parser.add_argument(

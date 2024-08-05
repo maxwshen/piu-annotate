@@ -131,7 +131,7 @@ class StepchartSSC(UserDict):
             'train': self.is_train(),
             'coop': self.is_coop(),
             'meter 99': self.has_99_meter(),
-            'not 4/4': not self.has_4_4_timesig(),
+            # 'not 4/4': not self.has_4_4_timesig(),
             'nonstandard steptype': not self.standard_stepstype(),
             'nonstandard songtype': not self.standard_songtype(),
         }
@@ -164,6 +164,9 @@ class StepchartSSC(UserDict):
     def is_pro(self) -> bool:
         return 'PRO' in self.data['DESCRIPTION'].upper()
 
+    def is_jump_edition(self) -> bool:
+        return 'JUMP' in self.data['DESCRIPTION'].upper()
+
     def is_performance(self) -> bool:
         items = ['SP', 'DP']
         return any(item in self.data['DESCRIPTION'].upper() for item in items)
@@ -190,8 +193,11 @@ class StepchartSSC(UserDict):
             lines = [line for line in measure.strip().split('\n')
                      if '//' not in line and line != '']
             for line in lines:
+                if line == '#NOTES:':
+                    continue
                 parsed_line = notelines.parse_line(line)
                 if any(x not in ok_chars for x in parsed_line):
+                    import code; code.interact(local=dict(globals(), **locals()))
                     return True
         return False            
 

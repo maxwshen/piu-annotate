@@ -29,7 +29,7 @@ def stepchart_ssc_to_chartstruct(
             Returns None if failed
         message: str
     """
-    assert stepchart.has_4_4_timesig()
+    # assert stepchart.has_4_4_timesig()
 
     warps = Warps(stepchart.get('WARPS', ''))
     
@@ -41,7 +41,11 @@ def stepchart_ssc_to_chartstruct(
     time = 0
     bpm = beat_to_bpm.get_init_bpm(beat)
 
-    b2l = BeatToLines(stepchart, warps)
+    try:
+        b2l = BeatToLines(stepchart, warps)
+    except Exception as e:
+        error_message = str(e)
+        return None, f'Error making BeatToLines: {error_message}'
 
     stops = BeatToValueDict.from_string(stepchart.get('STOPS', ''))
     stops.apply_warp(warps)
@@ -171,7 +175,10 @@ class BeatToLines:
         for measure_num, measure in enumerate(measures):
             lines = measure.split('\n')
             lines = [line for line in lines if '//' not in line and line != '']
+            lines = [line for line in lines if '#NOTE' not in line]
             num_subbeats = len(lines)
+            if num_subbeats % 4 != 0:
+                raise ValueError(f'{num_subbeats} lines in measure is not divisible by 4')
 
             for lidx, line in enumerate(lines):
                 beat_increment = Fraction(beats_per_measure, num_subbeats)
