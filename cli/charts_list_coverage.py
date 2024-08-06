@@ -162,6 +162,12 @@ def main():
     for k, v in Counter(mp_cs_msg).items():
         logger.info(f'{k}: {v}')
 
+    # build message to stepchartssc mapping
+    cs_dd = defaultdict(list)
+    for msg, stepchart in zip(mp_cs_msg, standard_stepcharts):
+        if msg != 'success':
+            cs_dd[msg].append(stepchart)
+
     import code; code.interact(local=dict(globals(), **locals()))
     return
 

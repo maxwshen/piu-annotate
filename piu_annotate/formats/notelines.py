@@ -1,30 +1,15 @@
 """
     Logic re note lines from .ssc file
 """
-import re, functools
-
-idx_to_panel = {
-    0: 'p1,1',
-    1: 'p1,7',
-    2: 'p1,5',
-    3: 'p1,9',
-    4: 'p1,3',
-    5: 'p2,1',
-    6: 'p2,7',
-    7: 'p2,5',
-    8: 'p2,9',
-    9: 'p2,3',
-}
-panel_to_idx = {panel: idx for idx, panel in idx_to_panel.items()}
+import re
 
 
-def panel_to_action(line: str) -> dict[str, str]:
-    panel_to_action = dict()
+def panel_idx_to_action(line: str) -> dict[int, str]:
+    idx_to_action = dict()
     for idx, action in enumerate(line):
-        panel = idx_to_panel[idx]
         if action != '0':
-            panel_to_action[panel] = action
-    return panel_to_action
+            idx_to_action[idx] = action
+    return idx_to_action
 
 
 def singlesdoubles(line: str) -> str:
@@ -85,15 +70,14 @@ def frac_two_arrows_bracketable(lines: list[str]) -> float:
     return num_bracketable / len(two_arrow_lines)
 
 
-def add_active_holds(line: str, active_holds: set[str]) -> str:
+def add_active_holds(line: str, active_hold_idxs: set[str]) -> str:
     """ Add active holds into line as '4'. 01000 -> 01040 """
     aug_line = list(line)
-    for panel in active_holds:
-        idx = panel_to_idx[panel]
-        if aug_line[idx] == '0':
-          aug_line[idx] = '4'
-        elif aug_line[idx] in ['1', '2']:
-            raise Exception('Error: Tried to place active hold 4 onto 1 or 2')
+    for panel_idx in active_hold_idxs:
+        if aug_line[panel_idx] == '0':
+          aug_line[panel_idx] = '4'
+        elif aug_line[panel_idx] in ['1', '2']:
+            raise Exception('Error: Tried to place active hold 4 onto 1/2')
     return ''.join(aug_line)
 
 
@@ -120,7 +104,6 @@ def parse_line(line: str) -> str:
                 nl += note_type
     line = nl
 
-    # F is fake note
     replace = {
         'F': '0',
         'M': '0',
@@ -133,9 +116,12 @@ def parse_line(line: str) -> str:
         'I': '1',
         '4': '2',
         '6': '2',
-        'L': '3',
+        'L': '1',
     }
     line = line.translate(str.maketrans(replace))
+
+    if any(x not in set(list('01234')) for x in line):
+        raise ValueError(f'Bad symbol found in {line}')
     return line
 
 

@@ -42,7 +42,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--stepchart_ssc_file', 
-        default = '/home/maxwshen/piu-annotate/output/problematic-ssc/Bon_Bon_Chocolat_-_EVERGLOW_S16_ARCADE.ssc'
+        default = '/home/maxwshen/piu-annotate/cli/timesig34-wicked-legend-s16.ssc'
     )
     args.parse_args(parser)
     main()
