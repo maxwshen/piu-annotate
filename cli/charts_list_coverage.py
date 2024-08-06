@@ -16,6 +16,25 @@ from piu_annotate.crawl import crawl_stepcharts
 from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 
 
+def allowed_multimatch(ae_ci: ArrowEclipseChartInfo) -> bool:
+    multimatches = {
+        'Baroque Virus - FULL SONG -': {
+            'level': 23,
+            'type': 'Double',
+        }
+    }
+    def match_dict(query: dict, target: dict):
+        return all(query[k] == target[k] for k in query)
+
+    if ae_ci.data['song']['name'] not in multimatches:
+        return False
+    
+    for song_name, mm in multimatches.items():
+        if match_dict(mm, ae_ci.data):
+            return True
+    return False
+
+
 def fuzzy_match_song_name(query: str, targets: list[str]) -> str | None:
     close_matches = difflib.get_close_matches(query, targets)
     if len(close_matches) > 0:
@@ -46,14 +65,14 @@ def match_aeci_to_ssc(
         matched_song_name = fuzzy_matched_song
     stepcharts = song_name_to_stepcharts[matched_song_name]
     matched_ssc = [sc for sc in stepcharts if ae_ci.matches_stepchart_ssc_partial(sc)]
-    # if len(matched_ssc) == 2:
-    #     import code; code.interact(local=dict(globals(), **locals()))
+    if len(matched_ssc) > 1 and not allowed_multimatch(ae_ci):
+        return [], f'Unexpectedly matched {len(matched_ssc)} stepcharts in .ssc'
     return matched_ssc, len(matched_ssc)
 
 
-def get_num_bad_lines(stepchart: StepchartSSC) -> int:
-    cs_df, num_bad_lines = stepchart_ssc_to_chartstruct(stepchart)
-    return num_bad_lines
+def try_ssc_to_chartstruct(stepchart: StepchartSSC) -> str:
+    cs_df, cs_message = stepchart_ssc_to_chartstruct(stepchart)
+    return cs_message
 
 
 def main():
@@ -133,15 +152,14 @@ def main():
     """
     # convert standard .ssc into chartstruct
     import multiprocessing as mp
-    logger.info(f'Computing num. bad lines in standard stepcharts ...')
+    logger.info(f'Converting standard .ssc to chartstruct ...')
     inputs = [[stepchart] for stepchart in standard_stepcharts]
     with mp.Pool(num_processes := 6) as pool:
-        mp_num_bad_lines = pool.starmap(
-            get_num_bad_lines,
+        mp_cs_msg = pool.starmap(
+            try_ssc_to_chartstruct,
             tqdm(inputs, total = len(inputs))
         )
-    logger.info(f'Computing num. bad lines count in standard stepcharts: ')
-    for k, v in Counter(mp_num_bad_lines).items():
+    for k, v in Counter(mp_cs_msg).items():
         logger.info(f'{k}: {v}')
 
     import code; code.interact(local=dict(globals(), **locals()))
