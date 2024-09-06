@@ -1,11 +1,16 @@
 import pandas as pd
 from tqdm import tqdm
 from loguru import logger
+import math
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
 from .ssc_to_chartstruct import stepchart_ssc_to_chartstruct
-from piu_annotate.formats.jsplot import ArrowArt, HoldArt
+from piu_annotate.formats.jsplot import ArrowArt, HoldArt, ChartJsStruct
+
+
+def is_active_symbol(sym: str) -> bool: 
+    return sym in set('1234')
 
 
 class ChartStruct:
@@ -49,6 +54,9 @@ class ChartStruct:
     def from_file(csv_file: str):
         return ChartStruct(pd.read_csv(csv_file))
 
+    def to_csv(self, filename: str):
+        self.df.to_csv(filename)
+
     @staticmethod
     def from_piucenterdataframe(pc_df: PiuCenterDataFrame):
         """ Make ChartStruct from old PiuCenter d_annotate df.
@@ -64,7 +72,7 @@ class ChartStruct:
         df['Line with active holds'] = [f'`{line}' for line in df['Line with active holds']]
         return ChartStruct(df)
     
-    def validate(self):
+    def validate(self) -> None:
         """ Validate format -- see docstring. """
         # logger.debug('Verifying ChartStruct ...')
         cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Limb annotation']
@@ -103,10 +111,124 @@ class ChartStruct:
             assert set(limb_annot).issubset(limb_symbols)
         return
 
+    def __time_to_df_idx(self, query_time: float) -> list[int]:
+        """ Finds df row idx by query_time """
+        index = self.df.index[self.df['Time'].apply(lambda t: math.isclose(query_time, t))]
+        idxs = index.to_list()
+        if len(idxs) > 1:
+            logger.warning(f'... matched multiple lines at {query_time=}')
+        return idxs
+
+    def matches_chart_json(
+        self, 
+        chartjs: ChartJsStruct, 
+        with_limb_annot: bool = True
+    ) -> bool:
+        self_cjs = ChartJsStruct.from_chartstruct(self)
+        return self_cjs.matches(chartjs, with_limb_annot = with_limb_annot)
+
+    def update_from_manual_json(self, chartjs: ChartJsStruct, verbose: bool = False) -> None:
+        """ Updates ChartStruct given chart json, which can be manually
+            annotated in step editor web app.
+        """
+        is_compatible = self.matches_chart_json(chartjs, with_limb_annot = False)
+        if not is_compatible:
+            logger.error('Tried to update chartstruct with non-matching chart json')
+            return
+
+        # update arrow arts
+        num_arrow_arts_updated = 0
+        for aa in chartjs.arrow_arts:
+            df_idxs = self.__time_to_df_idx(aa.time)
+
+            n_updates_made = 0
+            for df_idx in df_idxs:
+                update_made = self.__update_row_with_limb_annot(
+                    df_idx, 
+                    aa.arrow_pos, 
+                    aa.limb,
+                    expected_symbols = ['1'],
+                )
+                if update_made:
+                    n_updates_made += 1
+            
+            num_arrow_arts_updated += n_updates_made
+            if n_updates_made > 1:
+                logger.warning(f'Used one arrow art to update multiple lines')
+        
+        if verbose:
+            logger.info(f'Updated {num_arrow_arts_updated} arrows with limb annotations')
+
+        # update hold arts
+        num_hold_arts_updated = 0
+        num_hold_art_lines_updated = 0
+        for ha in chartjs.hold_arts:
+            df_start_idx = self.__time_to_df_idx(ha.start_time)[0]
+            df_end_idx = self.__time_to_df_idx(ha.end_time)[-1]
+
+            n_lines_updated = 0
+            for row_idx in range(df_start_idx, df_end_idx + 1):
+                update_made = self.__update_row_with_limb_annot(
+                    row_idx, 
+                    ha.arrow_pos, 
+                    ha.limb,
+                    expected_symbols = ['2', '3', '4'],
+                )
+
+                if update_made:
+                    n_lines_updated += 1
+            if n_lines_updated:
+                num_hold_art_lines_updated += n_lines_updated
+                num_hold_arts_updated += 1
+        
+        if verbose:
+            logger.success(f'Updated {num_hold_arts_updated} holds with limb annotations')
+            logger.success(f'Updated {num_hold_art_lines_updated} lines updated with hold art limb annotations')
+        return
+
+    def __update_row_with_limb_annot(
+        self, 
+        row_idx: int, 
+        new_arrow_pos: int, 
+        new_limb: str,
+        expected_symbols: list[str],
+    ) -> bool:
+        """ Update limb annotation for `row_idx` in self.df,
+            to use `new_limb` for `new_arrow_pos`.
+
+            Returns whether an update was made, or whether requested limb annotation
+            was already in use (so no update made).
+        """
+        line = self.df.iloc[row_idx]['Line with active holds'].replace('`', '')
+
+        if line[new_arrow_pos] not in expected_symbols:
+            return False
+
+        curr_limb_annot = self.df.iloc[row_idx]['Limb annotation']          
+
+        if curr_limb_annot == '':
+            n_active_symbols = sum(is_active_symbol(s) for s in line)
+            new_annot = '?' * n_active_symbols
+            self.df.loc[row_idx, 'Limb annotation'] = new_annot
+            curr_limb_annot = new_annot
+
+        arrow_pos_to_limb_annot_idx = {
+            arrow_pos: sum(is_active_symbol(s) for s in line[:arrow_pos])
+            for arrow_pos in range(len(line))
+        }
+        limb_annot_idx = arrow_pos_to_limb_annot_idx[new_arrow_pos]
+        if curr_limb_annot[limb_annot_idx] != new_limb:
+            curr_limb_annot_list = list(curr_limb_annot)
+            curr_limb_annot_list[limb_annot_idx] = new_limb
+            curr_limb_annot = ''.join(curr_limb_annot_list)
+            self.df.loc[row_idx, 'Limb annotation'] = curr_limb_annot
+            return True
+        return False
+
+
     def get_arrow_hold_arts(self) -> tuple[list[ArrowArt], list[HoldArt]]:
         arrow_arts = []
         hold_arts = []
-        is_active_symbol = lambda sym: sym in list('1234')
         get_limb = lambda limbs, idx: limbs[idx] if len(limbs) > 0 else '?'
         active_holds = {}   # arrowpos: (time start, limb)
         for _, row in self.df.iterrows():
