@@ -4,6 +4,26 @@
 import re
 
 
+def get_limb_for_arrow_pos(
+    line_with_active_holds: str, 
+    limb_annot: str,
+    arrow_pos: int,
+) -> str:
+    """ Get limb from `limb_annot` for `arrow_pos` in `line_with_active_holds`
+    """
+    limb_idx = get_limb_idx_for_arrow_pos(line_with_active_holds, arrow_pos)
+    return limb_annot[limb_idx]
+
+
+def get_limb_idx_for_arrow_pos(
+    line_with_active_holds: str,
+    arrow_pos: int
+) -> int:
+    line = line_with_active_holds.replace('`', '')
+    n_active_symbols_before = arrow_pos - line[:arrow_pos].count('0')
+    return n_active_symbols_before
+
+
 def panel_idx_to_action(line: str) -> dict[int, str]:
     idx_to_action = dict()
     for idx, action in enumerate(line):
@@ -22,6 +42,10 @@ def singlesdoubles(line: str) -> str:
 
 def has_downpress(line: str) -> bool:
     return num_downpress(line) > 0
+
+
+def has_one_arrow(line: str) -> bool:
+    return line.count('1') == 1 and (line.count('0') in [4, 9])
 
 
 def num_downpress(line: str) -> int:

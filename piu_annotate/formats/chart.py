@@ -2,15 +2,28 @@ import pandas as pd
 from tqdm import tqdm
 from loguru import logger
 import math
+from dataclasses import dataclass
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
 from .ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 from piu_annotate.formats.jsplot import ArrowArt, HoldArt, ChartJsStruct
+from piu_annotate.formats import notelines
 
 
 def is_active_symbol(sym: str) -> bool: 
     return sym in set('1234')
+
+
+def right_index(items: list[any], query: any) -> int:
+    return len(items) - 1 - items[::-1].index(query)
+
+
+@dataclass
+class PredictionCoordinate:
+    row_idx: int
+    arrow_pos: int
+    limb_idx: int
 
 
 class ChartStruct:
@@ -111,6 +124,146 @@ class ChartStruct:
             assert set(limb_annot).issubset(limb_symbols)
         return
 
+    """
+        Properties
+    """
+    def singles_or_doubles(self) -> str:
+        """ Returns 'singles' or 'doubles' """
+        line = self.df['Line'].iloc[0].replace('`', '')
+        assert len(line) in [5, 10]
+        if len(line) == 5:
+            return 'singles'
+        elif len(line) == 10:
+            return 'doubles'
+
+    """
+        Prediction
+    """
+    def get_prediction_coordinates(self) -> list[PredictionCoordinate]:
+        """ Find arrows to predict limb annotation: focus on 1/2.
+            Returns list of (row_idx, arrow_pos, limb_idx)
+        """
+        pred_coords = []
+        for idx, row in self.df.iterrows():
+            line = row['Line'].replace('`', '')
+            for arrow_pos, action in enumerate(line):
+                if action in list('12'):
+                    limb_idx = notelines.get_limb_idx_for_arrow_pos(
+                        row['Line with active holds'],
+                        arrow_pos
+                    )
+                    pred_coord = PredictionCoordinate(idx, arrow_pos, limb_idx)
+                    pred_coords.append(pred_coord)
+        return pred_coords
+
+    def get_limb(self, pred_coord: PredictionCoordinate) -> str:
+        row = self.df.iloc[pred_coord.row_idx]
+
+    def add_limb_annotations(
+        self, 
+        pred_coords: list[PredictionCoordinate],
+        limb_annots: list[str],
+        new_col: str,
+    ) -> None:
+        """ Populates `new_col` in df with `limb_annots` at `pred_coords`,
+            for example predicted limb annotations.
+        """
+        assert len(pred_coords) == len(limb_annots)
+        self.init_limb_annotations(new_col)
+
+        # update
+        for pred_coord, new_limb in zip(pred_coords, limb_annots):
+            row_idx = pred_coord.row_idx
+            limb_idx = pred_coord.limb_idx
+
+            prev_annot = self.df.iloc[row_idx][new_col]
+            new_annot = prev_annot[:limb_idx] + new_limb + prev_annot[limb_idx + 1:]
+            self.df.loc[row_idx, new_col] = new_annot
+        return
+
+    def init_limb_annotations(self, new_col: str) -> None:
+        """ Initializes limb annotations to `new_col` as all ? """
+        limb_annots = []
+        for idx, row in self.df.iterrows():
+            line = row['Line with active holds']
+            n_active_symbols = sum(is_active_symbol(s) for s in line)
+            limb_annots.append('?' * n_active_symbols)
+        self.df[new_col] = limb_annots
+        return
+
+    """
+        Annotate
+    """
+    def annotate_time_since_downpress(self):
+        """ Adds column `__time since prev downpress` to df
+        """
+        has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
+        recent_downpress_idx = None
+        time_since_dp = []
+        for idx, row in self.df.iterrows():
+            
+            if recent_downpress_idx is None:
+                time_since_dp.append(-1)
+            else:
+                prev_dp_time = self.df.iloc[recent_downpress_idx]['Time']
+                time_since_dp.append(row['Time'] - prev_dp_time)
+
+            has_dp = has_dps[idx]
+            if has_dp:
+                recent_downpress_idx = idx
+
+        self.df['__time since prev downpress'] = time_since_dp
+        return
+
+    def annotate_line_repeats_previous(self):
+        """ Adds column `__line repeats previous` to df,
+            which is True if current line is the same as previous or next line
+            with downpress.
+        """
+        has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
+        lines = list(self.df['Line'])
+        line_repeats = []
+        for idx in range(len(self.df)):
+            repeats = False
+
+            prev = has_dps[:idx]
+            prev_downpress_idx = None
+            if any(prev):
+                prev_downpress_idx = right_index(prev, True)
+                if lines[prev_downpress_idx] == lines[idx]:
+                    repeats = True
+
+            line_repeats.append(repeats)
+
+        self.df['__line repeats previous'] = line_repeats
+        return
+
+    def annotate_line_repeats_next(self):
+        """ Adds column `__line repeats next` to df,
+            which is True if current line is the same as previous or next line
+            with downpress.
+        """
+        has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
+        lines = list(self.df['Line'])
+        line_repeats = []
+        for idx in range(len(self.df)):
+            repeats = False
+            
+            next = has_dps[idx + 1:]
+            next_downpress_idx = None
+            if any(next):
+                next_downpress_idx = idx + 1 + next.index(True)
+                if lines[next_downpress_idx] == lines[idx]:
+                    repeats = True
+
+            line_repeats.append(repeats)
+
+        self.df['__line repeats next'] = line_repeats
+        return
+
+    """
+        Search
+    """
     def __time_to_df_idx(self, query_time: float) -> list[int]:
         """ Finds df row idx by query_time """
         index = self.df.index[self.df['Time'].apply(lambda t: math.isclose(query_time, t))]
@@ -119,6 +272,9 @@ class ChartStruct:
             logger.warning(f'... matched multiple lines at {query_time=}')
         return idxs
 
+    """
+        Interaction with chart json: check match, update
+    """
     def matches_chart_json(
         self, 
         chartjs: ChartJsStruct, 
@@ -225,7 +381,9 @@ class ChartStruct:
             return True
         return False
 
-
+    """
+        Arts
+    """
     def get_arrow_hold_arts(self) -> tuple[list[ArrowArt], list[HoldArt]]:
         arrow_arts = []
         hold_arts = []
