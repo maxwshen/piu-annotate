@@ -29,10 +29,11 @@ def main():
     for csv in tqdm(csvs):
         cs = ChartStruct.from_file(csv)
         if cs.singles_or_doubles() == singles_doubles:
-            points, labels = featurizers.featurize_chart_struct(
-                cs, 
-                include_limb_context = True
-            )
+            
+            fcs = featurizers.FeaturizedChartStruct(cs)
+            labels = fcs.labels_to_array()
+            points = fcs.get_prediction_input_with_context(use_limb_features = True)
+
             all_points.append(points)
             all_labels.append(labels)
             n_csvs += 1

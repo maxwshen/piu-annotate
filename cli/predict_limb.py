@@ -32,12 +32,15 @@ def main():
         First prediction pass: Without limb context
     """
     # featurize
-    points, labels = featurizers.featurize_chart_struct(cs)
+    fcs = featurizers.FeaturizedChartStruct(cs)
+    points = fcs.get_prediction_input_with_context()
+    labels = fcs.labels_to_array()
     logger.info(f'Found dataset shape {points.shape}')
 
     pred_limbs = model_nolimb.predict(points)
     int_to_limb = {0: 'l', 1: 'r'}
     pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
+    pred_limb_probs = model_nolimb.predict_proba(points)[:, -1]
 
     # compare
     accuracy = np.sum(labels == pred_limbs) / len(labels)
@@ -48,28 +51,35 @@ def main():
     """
     pred_coords = cs.get_prediction_coordinates()
 
-    for __i in range(10):
+    num_iters = 5
+    for __i in range(num_iters):
         cs.add_limb_annotations(pred_coords, pred_limb_strs, '__pred limb v1')
 
-        # re-featurize
-        points, labels = featurizers.featurize_chart_struct(
-            cs, 
-            limb_context_col = '__pred limb v1',
-            include_limb_context = True,
-        )
-        logger.info(f'Found dataset shape {points.shape}')
+        # weight
+        weight = (__i + 1) / (num_iters + 1)
 
-        pred_limbs_v2 = model_withlimb.predict(points)
+        adj_limb_probs = weight * pred_limb_probs + (1 - weight) * 0.5 * np.ones(pred_limb_probs.shape)
+
+        # fcs.update_with_pred_limb_probs(pred_limb_probs, pred_limb_probs < 0.9)
+        fcs.update_with_pred_limb_probs(adj_limb_probs, adj_limb_probs < 0.9)
+        points_withlimb = fcs.get_prediction_input_with_context(
+            use_limb_features = True
+        )
+
+        logger.info(f'Found dataset shape {points_withlimb.shape}')
+
+        pred_limbs = model_withlimb.predict(points_withlimb)
+        pred_limb_probs = model_withlimb.predict_proba(points_withlimb)[:, -1]
 
         # compare
-        accuracy = np.sum(labels == pred_limbs_v2) / len(labels)
+        accuracy = np.sum(labels == pred_limbs) / len(labels)
         logger.info(f'{accuracy=}')
-        pred_limb_strs = [int_to_limb[i] for i in pred_limbs_v2]
+        pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
 
     cs.add_limb_annotations(pred_coords, pred_limb_strs, '__pred limb final')
 
     print('Error indices:')
-    print(np.where(labels != pred_limbs_v2))
+    print(np.where(labels != pred_limbs))
 
     cs.df.to_csv('temp/conflict-s11.csv')
     import code; code.interact(local=dict(globals(), **locals()))

@@ -21,11 +21,13 @@ class ArrowDataPoint(AbstractArrowDataPoint):
     n_arrows_in_same_line: int
     line_repeats_previous: bool
     line_repeats_next: bool
+    singles_or_doubles: str
 
-    def to_array(self, singles_or_doubles: str) -> NDArray:
-        assert singles_or_doubles in ['singles', 'doubles']
+    def to_array(self) -> NDArray:
+        assert self.singles_or_doubles in ['singles', 'doubles']
         sd_to_len = {'singles': 5, 'doubles': 10}
-        arrows = [0] * sd_to_len[singles_or_doubles]
+        arrows = [0] * sd_to_len[self.singles_or_doubles]
+        assert self.arrow_pos < len(arrows)
         arrows[self.arrow_pos] = 1
         return np.array(arrows + [
             self.time_since_prev_downpress, 
@@ -42,20 +44,21 @@ class ArrowDataPointWithLimbContext(AbstractArrowDataPoint):
     n_arrows_in_same_line: int
     line_repeats_previous: bool
     line_repeats_next: bool
-    limb_annot: str
+    limb_annot: float
+    singles_or_doubles: str
 
-    def to_array(self, singles_or_doubles: str) -> NDArray:
-        assert singles_or_doubles in ['singles', 'doubles']
+    def to_array(self) -> NDArray:
+        assert self.singles_or_doubles in ['singles', 'doubles']
         sd_to_len = {'singles': 5, 'doubles': 10}
-        arrows = [0] * sd_to_len[singles_or_doubles]
+        arrows = [0] * sd_to_len[self.singles_or_doubles]
+        assert self.arrow_pos < len(arrows)
         arrows[self.arrow_pos] = 1
-        limb_to_val = {'l': 0, 'r': 1}
         return np.array(arrows + [
             self.time_since_prev_downpress, 
             self.n_arrows_in_same_line,
             int(self.line_repeats_previous),
             int(self.line_repeats_next),
-            limb_to_val.get(self.limb_annot, -1),
+            self.limb_annot
         ])
 
 
@@ -73,8 +76,8 @@ class LimbLabel:
     
 
 class ArrowDataPointConstructor:
-    def __init__(self):
-        pass
+    def __init__(self, singles_or_doubles: str):
+        self.singles_or_doubles = singles_or_doubles
 
     def build(
         self, 
@@ -99,6 +102,7 @@ class ArrowDataPointConstructor:
                 n_arrows_in_same_line = n_arrows_in_same_line,
                 line_repeats_previous = row['__line repeats previous'],
                 line_repeats_next = row['__line repeats next'],
+                singles_or_doubles = self.singles_or_doubles,
             )
         elif limb_context:
             limb_label = notelines.get_limb_for_arrow_pos(
@@ -106,11 +110,13 @@ class ArrowDataPointConstructor:
                 row[limb_context_col],
                 arrow_pos
             )
+            limb_label_to_val = {'l': 0.0, 'r': 1.0}
             return ArrowDataPointWithLimbContext(
                 arrow_pos = arrow_pos,
                 time_since_prev_downpress = row['__time since prev downpress'],
                 n_arrows_in_same_line = n_arrows_in_same_line,
                 line_repeats_previous = row['__line repeats previous'],
                 line_repeats_next = row['__line repeats next'],
-                limb_annot = limb_label,
+                limb_annot = limb_label_to_val[limb_label],
+                singles_or_doubles = self.singles_or_doubles,
             )
