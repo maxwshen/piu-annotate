@@ -30,9 +30,11 @@ def main():
         cs = ChartStruct.from_file(csv)
         if cs.singles_or_doubles() == singles_doubles:
 
-            fcs = featurizers.FeaturizedChartStruct(cs)
-            labels = fcs.labels_to_array()
-            points = fcs.get_prediction_input_with_context()
+            fcs = featurizers.ChartStructFeaturizer(cs)
+            labels = fcs.get_labels_from_limb_col('Limb annotation')
+            # labels = fcs.get_label_matches_prev('Limb annotation')
+            # labels = fcs.get_label_matches_next('Limb annotation')
+            points = fcs.featurize_arrows_with_context()
 
             all_points.append(points)
             all_labels.append(labels)

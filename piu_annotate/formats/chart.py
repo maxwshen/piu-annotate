@@ -156,9 +156,6 @@ class ChartStruct:
                     pred_coords.append(pred_coord)
         return pred_coords
 
-    def get_limb(self, pred_coord: PredictionCoordinate) -> str:
-        row = self.df.iloc[pred_coord.row_idx]
-
     def add_limb_annotations(
         self, 
         pred_coords: list[PredictionCoordinate],
