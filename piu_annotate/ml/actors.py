@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 import itertools
 import numpy as np
 from operator import itemgetter
+import functools
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
@@ -131,18 +132,19 @@ class Actor:
     ) -> NDArray:
         """ Use parity prediction to find jack sections, and put best limb
         """
+        logger.info(f'Flipping jack sections ...')
         pred_matches_next = self.predict_matchnext()
         ranges = get_ranges(pred_matches_next, 1)
 
         orig_pred_limbs = pred_limbs.copy()
         new_pred_limbs = pred_limbs.copy()
-        for start, end in ranges:
+        for start, end in tqdm(ranges):
             exp_match_end = end + 1
             pred_subset = pred_limbs[start : exp_match_end]
             if len(set(pred_subset)) == 1:
                 if only_consider_nonuniform_jacks:
                     continue
-            logger.debug(f'{pred_subset}, {start}, {exp_match_end}')
+            # logger.debug(f'{pred_subset}, {start}, {exp_match_end}')
 
             all_left = orig_pred_limbs.copy()
             all_left[start : exp_match_end] = 0
@@ -159,9 +161,43 @@ class Actor:
 
         return new_pred_limbs
 
+    def beam_search(
+        self, 
+        pred_limbs: NDArray, 
+        width: int, 
+        n_iter: int
+    ) -> list[NDArray]:
+        """ """
+        def get_top_flips(pred_limbs: NDArray) -> NDArray:
+            imp = self.label_flip_improvement(pred_limbs)
+            return np.where(imp > sorted(imp)[-width])
+        
+        def flip(pred_limbs: NDArray, idx: int) -> NDArray:
+            new = pred_limbs.copy()
+            new[idx] = 1 - new[idx]
+            return new
+
+        def beam(pred_limbs: list[NDArray]) -> list[NDArray]:
+            top_flip_idxs = [get_top_flips(pl) for pl in pred_limbs]
+            return [
+                flip(pl, idx) for pl, tfi in zip(pred_limbs, top_flip_idxs)
+                for idx in tfi
+            ]
+
+        inp = [pred_limbs]
+        all_pred_limbs = inp
+        for i in range(n_iter):
+            inp = beam(inp)
+            all_pred_limbs += inp
+
+        scores = [self.score(pl) for pl in all_pred_limbs]
+        best = max(scores)
+        return all_pred_limbs[scores.index(best)]
+
     """
         Model predictions
     """
+    @functools.cache
     def predict_arrow(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
@@ -176,6 +212,7 @@ class Actor:
         else:
             return self.models.model_arrowlimbs_to_limb.predict(points)
 
+    @functools.cache
     def predict_matchnext(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
@@ -183,6 +220,7 @@ class Actor:
         else:
             return self.models.model_arrows_to_matchnext.predict(points)
 
+    @functools.cache
     def predict_matchprev(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:

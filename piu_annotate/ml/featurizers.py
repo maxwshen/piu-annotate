@@ -6,22 +6,23 @@ import numpy as np
 from numpy.typing import NDArray
 from loguru import logger
 from hackerargs import args
+import functools
 
 from piu_annotate.formats.chart import ChartStruct, PredictionCoordinate
 from piu_annotate.formats import notelines
-from piu_annotate.ml.datapoints import LimbLabel, ArrowDataPoint, ArrowDataPointWithLimbContext
+from piu_annotate.ml.datapoints import LimbLabel, ArrowDataPoint
 
 
 class ChartStructFeaturizer:
     def __init__(self, cs: ChartStruct):
         """ Featurizer for ChartStruct, generating:
             - list of ArrowDataPoint
-            - list of ArrowDataPointWithLimbContext
             - list of LimbLabels
             and creating prediction inputs for each arrow with context,
             as NDArrays
         """
         self.cs = cs
+        self.context_len = args.setdefault('ft.context_length', 20)
 
         cs.annotate_time_since_downpress()
         cs.annotate_line_repeats_previous()
@@ -30,6 +31,7 @@ class ChartStructFeaturizer:
 
         self.singles_or_doubles = cs.singles_or_doubles()
         self.points_nolimb = self.get_arrows_nolimb()
+        self.pt_array = [pt.to_array() for pt in self.points_nolimb]
 
     """
         Build
@@ -38,9 +40,12 @@ class ChartStructFeaturizer:
         all_points_nolimb = []
         for pred_coord in self.pred_coords:
             row = self.cs.df.iloc[pred_coord.row_idx]
-            line = row['Line']
+            line = row['Line with active holds'].replace('`', '')
+            arrow_pos = pred_coord.arrow_pos
             point = ArrowDataPoint(
-                arrow_pos = pred_coord.arrow_pos,
+                arrow_pos = arrow_pos,
+                is_hold = bool(line[arrow_pos] == '2'),
+                active_hold_idxs = [i for i, s in enumerate(line) if s in list('34')],
                 time_since_prev_downpress = row['__time since prev downpress'],
                 n_arrows_in_same_line = line.count('1') + line.count('2'),
                 line_repeats_previous = row['__line repeats previous'],
@@ -49,28 +54,6 @@ class ChartStructFeaturizer:
             )
             all_points_nolimb.append(point)
         return all_points_nolimb
-
-    def get_arrows_withlimb(
-        self, 
-        limb_array: NDArray,
-    ) -> list[ArrowDataPointWithLimbContext]:
-        all_points_withlimb = []
-        assert limb_array is not None
-        assert len(limb_array) == len(self.pred_coords)
-        for pred_coord, limb_val in zip(self.pred_coords, limb_array):
-            row = self.cs.df.iloc[pred_coord.row_idx]
-            line = row['Line']
-            point = ArrowDataPointWithLimbContext(
-                arrow_pos = pred_coord.arrow_pos,
-                time_since_prev_downpress = row['__time since prev downpress'],
-                n_arrows_in_same_line = line.count('1') + line.count('2'),
-                line_repeats_previous = row['__line repeats previous'],
-                line_repeats_next = row['__line repeats next'],
-                limb_annot = limb_val,
-                singles_or_doubles = self.singles_or_doubles,
-            )
-            all_points_withlimb.append(point)
-        return all_points_withlimb
 
     def get_labels_from_limb_col(self, limb_col: str) -> NDArray:
         all_labels = []
@@ -93,65 +76,63 @@ class ChartStructFeaturizer:
     """
         Featurize
     """
+    @functools.cache
+    def get_padded_array(self) -> NDArray:
+        pt_array = self.pt_array
+        context_len = self.context_len
+        empty_pt = np.zeros(len(pt_array[0]))
+        return np.array([empty_pt]*context_len + pt_array + [empty_pt]*context_len)
+
+    @functools.cache
     def featurize_arrows_with_context(self) -> NDArray:
         """ For N arrows with D feature dims, constructs prediction input
             for each arrow including context arrows on both sides.
             
             If not using limb_context, returns shape N x [(2*context_len + 1)*D]
-            If using limb_context, includes limb features (observed for training,
-            predicted at test time) in context arrows.
         """
-        pt_nolimb_array = [point.to_array() for point in self.points_nolimb]
+        padded_pts = self.get_padded_array()
+        context_len = self.context_len
 
-        # Concatenate arrows and pad
-        context_len = args.setdefault('ft.context_length', 20)
-        empty_pt_nolimb = np.zeros(len(pt_nolimb_array[0]))
-
-        padded_nolimb = [empty_pt_nolimb]*context_len + pt_nolimb_array + \
-                        [empty_pt_nolimb]*context_len
-
-        # Form prediction inputs: each arrow, surrounded by `context_len` arrows
-        # on both sides.
-        ft_inps = []
-        for i in range(context_len, len(padded_nolimb) - context_len):
-            window = np.concatenate(padded_nolimb[i - context_len : i + context_len + 1])
-            ft_inps.append(window)
-        return np.array(ft_inps)
+        c2_plus_1 = 2 * context_len + 1
+        view = np.lib.stride_tricks.sliding_window_view(
+            padded_pts, 
+            (c2_plus_1), 
+            axis = 0
+        )
+        (N, D, c2_plus_1) = view.shape
+        view = np.reshape(view, (N, D*c2_plus_1))
+        return view
 
     def featurize_arrowlimbs_with_context(self, limb_probs: NDArray) -> NDArray:
-        """ For N arrows with D feature dims, constructs prediction input
-            for each arrow including context arrows on both sides.
+        """ Include `limb_probs` as features.
+            At training, limb_probs are binary.
+            At test time, limb_probs can be floats or binary.
             
-            If not using limb_context, returns shape N x [(2*context_len + 1)*D]
-            If using limb_context, includes limb features (observed for training,
-            predicted at test time) in context arrows.
+            For speed, we precompute featurized arrows into np.array,
+            and concatenate this to limb_probs subsection in sliding windows.
         """
-        pt_nolimb_array = [point.to_array() for point in self.points_nolimb]
+        context_len = self.context_len
+        c2_plus_1 = 2 * context_len + 1
 
-        points_withlimb = self.get_arrows_withlimb(limb_probs)
-        pt_withlimb_array = [point.to_array() for point in points_withlimb]
+        arrow_view = self.featurize_arrows_with_context()
 
-        # Concatenate arrows and pad
-        context_len = args.setdefault('ft.context_length', 20)
-        empty_pt_withlimb = np.zeros(len(pt_withlimb_array[0]))
-        empty_pt_nolimb = np.zeros(len(pt_nolimb_array[0]))
-
-        padded_nolimb = [empty_pt_nolimb]*context_len + pt_nolimb_array + \
-                        [empty_pt_nolimb]*context_len
-        padded_withlimb = [empty_pt_withlimb]*context_len + pt_withlimb_array + \
-                        [empty_pt_withlimb]*context_len
-
-        # Form prediction inputs: each arrow, surrounded by `context_len` arrows
-        # on both sides.
-        ft_inps = []
-        for i in range(context_len, len(padded_nolimb) - context_len):
-            window = np.concatenate([
-                np.concatenate(padded_withlimb[i - context_len : i]),
-                padded_nolimb[i],
-                np.concatenate(padded_withlimb[i + 1 : i + context_len])
-            ])
-            ft_inps.append(window)
-        return np.array(ft_inps)
+        padded_limbs = np.concatenate([
+            [-1]*context_len,
+            limb_probs,
+            [-1]*context_len
+        ])
+        limb_view = np.lib.stride_tricks.sliding_window_view(
+            padded_limbs, 
+            (c2_plus_1), 
+            axis = 0
+        )
+        # remove limb annot for arrow to predict on, but keep context
+        limb_view = np.concatenate([
+            limb_view[:, :context_len],
+            limb_view[:, -context_len:]
+        ], axis = 1)
+        array_view = np.concatenate([arrow_view, limb_view], axis = 1)
+        return array_view
 
     """
         Evaluation

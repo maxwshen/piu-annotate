@@ -15,8 +15,11 @@ class AbstractArrowDataPoint:
 class ArrowDataPoint(AbstractArrowDataPoint):
     """ Datapoint representing a single arrow.
         A line can have multiple arrows.
+        This should not use any limb information for any arrow.
     """
     arrow_pos: int
+    is_hold: bool
+    active_hold_idxs: list[int]
     time_since_prev_downpress: float
     n_arrows_in_same_line: int
     line_repeats_previous: bool
@@ -29,37 +32,20 @@ class ArrowDataPoint(AbstractArrowDataPoint):
         arrows = [0] * sd_to_len[self.singles_or_doubles]
         assert self.arrow_pos < len(arrows)
         arrows[self.arrow_pos] = 1
-        return np.array(arrows + [
+
+        hold_arrows = [0] * sd_to_len[self.singles_or_doubles]
+        for idx in self.active_hold_idxs:
+            hold_arrows[idx] = 1
+
+        fts = [
+            int(self.is_hold),
+            int(len(self.active_hold_idxs) > 0),
             self.time_since_prev_downpress, 
             self.n_arrows_in_same_line,
             int(self.line_repeats_previous),
             int(self.line_repeats_next),
-        ])
-
-
-@dataclass
-class ArrowDataPointWithLimbContext(AbstractArrowDataPoint):
-    arrow_pos: int
-    time_since_prev_downpress: float
-    n_arrows_in_same_line: int
-    line_repeats_previous: bool
-    line_repeats_next: bool
-    limb_annot: float
-    singles_or_doubles: str
-
-    def to_array(self) -> NDArray:
-        assert self.singles_or_doubles in ['singles', 'doubles']
-        sd_to_len = {'singles': 5, 'doubles': 10}
-        arrows = [0] * sd_to_len[self.singles_or_doubles]
-        assert self.arrow_pos < len(arrows)
-        arrows[self.arrow_pos] = 1
-        return np.array(arrows + [
-            self.time_since_prev_downpress, 
-            self.n_arrows_in_same_line,
-            int(self.line_repeats_previous),
-            int(self.line_repeats_next),
-            self.limb_annot
-        ])
+        ]
+        return np.concatenate([arrows, hold_arrows, np.array(fts)])
 
 
 @dataclass

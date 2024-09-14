@@ -57,7 +57,7 @@ def main():
     print(model.score(test_x, test_y))
 
     out_dir = args.setdefault('out_dir', '/home/maxwshen/piu-annotate/artifacts/models/temp')
-    out_fn = os.path.join(out_dir, f'temp-withlimb-{singles_doubles}.pkl')
+    out_fn = os.path.join(out_dir, f'{singles_doubles}-arrowlimbs_to_limb.pkl')
     with open(out_fn, 'wb') as f:
         pickle.dump(model, f)
     logger.info(f'Saved model to {out_fn}')

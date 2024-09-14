@@ -227,7 +227,9 @@ class ChartStruct:
             prev_downpress_idx = None
             if any(prev):
                 prev_downpress_idx = right_index(prev, True)
-                if lines[prev_downpress_idx] == lines[idx]:
+                prev_line_std = lines[prev_downpress_idx].replace('2', '1')
+                curr_line_std = lines[idx].replace('2', '1')
+                if prev_line_std == curr_line_std:
                     repeats = True
 
             line_repeats.append(repeats)
@@ -250,7 +252,9 @@ class ChartStruct:
             next_downpress_idx = None
             if any(next):
                 next_downpress_idx = idx + 1 + next.index(True)
-                if lines[next_downpress_idx] == lines[idx]:
+                next_line_std = lines[next_downpress_idx].replace('2', '1')
+                curr_line_std = lines[idx].replace('2', '1')
+                if next_line_std == curr_line_std:
                     repeats = True
 
             line_repeats.append(repeats)

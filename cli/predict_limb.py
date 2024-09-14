@@ -31,17 +31,36 @@ def main():
 
     true_labels = fcs.get_labels_from_limb_col('Limb annotation')
 
+    # timer
+    # for i in tqdm(range(200)):
+        # fcs.featurize_arrowlimbs_with_context(true_labels)
+    # print('prediction speed test')
+    # for i in tqdm(range(100)):
+    #     actor.score(pred_limbs)
+
+    score_to_limbs = dict()
+
     # score true labels
     print(actor.score(true_labels))
 
     pred_limbs = actor.iterative_refine()
+    print(actor.score(pred_limbs))
+    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
     fcs.evaluate(pred_limbs)
 
     pred_limbs = actor.flip_labels_by_score(pred_limbs)
+    print(actor.score(pred_limbs))
+    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
     fcs.evaluate(pred_limbs)
 
     pred_limbs = actor.flip_jack_sections(pred_limbs)
+    print(actor.score(pred_limbs))
+    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
     fcs.evaluate(pred_limbs)
+
+    # best score
+    best_score = max(score_to_limbs.keys())
+    logger.success(f'Found {best_score=}')
 
     # annotate
     pred_coords = cs.get_prediction_coordinates()
@@ -49,7 +68,19 @@ def main():
     pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
     cs.add_limb_annotations(pred_coords, pred_limb_strs, '__pred limb final')
 
-    cs.df.to_csv('temp/conflict-s11.csv')
+    # cs.df.to_csv('temp/conflict-s11.csv')
+
+    logger.info(f'Trying beam search on best pred limbs ...')
+    best_limbs = score_to_limbs[best_score]
+    pred_limbs = actor.beam_search(best_limbs, width = 5, n_iter = 3)
+    print(actor.score(pred_limbs))
+    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
+    fcs.evaluate(pred_limbs)
+
+    # best score
+    best_score = max(score_to_limbs.keys())
+    logger.success(f'Found {best_score=}')
+
     import code; code.interact(local=dict(globals(), **locals()))
     logger.success('Done.')
     return
@@ -59,25 +90,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--chart_struct_csv', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Headless_Chicken_-_r300k_S21_arcade.csv'
     )
-    parser.add_argument(
-        '--model.arrows_to_limb', 
-        # default = '/home/maxwshen/piu-annotate/artifacts/models/091024/gbc-singles.pkl',
-        default = '/home/maxwshen/piu-annotate/artifacts/models/091024/line-repeat/temp-singles.pkl'
+    args.parse_args(
+        parser, 
+        '/home/maxwshen/piu-annotate/artifacts/models/091324/singles/model-config.yaml'
     )
-    parser.add_argument(
-        '--model.arrowlimbs_to_limb', 
-        default = '/home/maxwshen/piu-annotate/artifacts/models/091024/line-repeat/temp-withlimb-singles.pkl'
-    )
-    parser.add_argument(
-        '--model.arrows_to_matchnext', 
-        default = '/home/maxwshen/piu-annotate/artifacts/models/091024/label-matches-next/temp-singles.pkl'
-    )
-    parser.add_argument(
-        '--model.arrows_to_matchprev', 
-        default = '/home/maxwshen/piu-annotate/artifacts/models/091024/label-matches-prev/temp-singles.pkl'
-        # default = '/home/maxwshen/piu-annotate/artifacts/models/091024/gbc-singles-withlimbcontext.pkl',
-    )
-    args.parse_args(parser)
     main()
