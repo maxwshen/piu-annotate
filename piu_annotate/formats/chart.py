@@ -25,6 +25,9 @@ class PredictionCoordinate:
     arrow_pos: int
     limb_idx: int
 
+    def __hash__(self):
+        return hash((self.row_idx, self.arrow_pos, self.limb_idx))
+
 
 class ChartStruct:
     def __init__(self, df: pd.DataFrame):
@@ -155,6 +158,46 @@ class ChartStruct:
                     pred_coord = PredictionCoordinate(idx, arrow_pos, limb_idx)
                     pred_coords.append(pred_coord)
         return pred_coords
+
+    def get_time_since_last_same_arrow_use(self) -> dict[PredictionCoordinate, float]:
+        """ For each PredictionCoordinate, calculates the time since
+            that arrow was last used by any limb (1 or 3).
+        """
+        pc_to_time = dict()
+        last_time_used = [None] * 10
+        for idx, row in self.df.iterrows():
+            line = row['Line'].replace('`', '')
+            time = row['Time']
+            for arrow_pos, action in enumerate(line):
+                if action in list('12'):
+                    limb_idx = notelines.get_limb_idx_for_arrow_pos(
+                        row['Line with active holds'],
+                        arrow_pos
+                    )
+                    pred_coord = PredictionCoordinate(idx, arrow_pos, limb_idx)
+                    if last_time_used[arrow_pos] is not None:
+                        pc_to_time[pred_coord] = time - last_time_used[arrow_pos]
+                    else:
+                        pc_to_time[pred_coord] = -1
+                if action in list('13'):
+                    last_time_used[arrow_pos] = time
+        return pc_to_time
+
+    def get_previous_used_pred_coord_for_arrow(self) -> dict[int, int | None]:
+        """ Compute dict mapping PredictionCoordinate index to the index of
+            the PredictionCoordinate for the most recent previous time the
+            arrow was used.
+            If None, then None.
+            Supports limb featurization that annotates the most recent
+            (predicted) limb used for a given PredictionCoordinate. 
+        """
+        last_idx_used = [None] * 10
+        pcs = self.get_prediction_coordinates()
+        pc_to_prev_idx = dict()
+        for idx, pc in enumerate(pcs):            
+            pc_to_prev_idx[pc] = last_idx_used[pc.arrow_pos]
+            last_idx_used[pc.arrow_pos] = idx
+        return {idx: pc_to_prev_idx[pc] for idx, pc in enumerate(pcs)}
 
     def add_limb_annotations(
         self, 

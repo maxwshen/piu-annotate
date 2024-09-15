@@ -20,6 +20,8 @@ class ArrowDataPoint(AbstractArrowDataPoint):
     arrow_pos: int
     is_hold: bool
     active_hold_idxs: list[int]
+    same_line_as_next_datapoint: bool
+    time_since_last_same_arrow_use: float
     time_since_prev_downpress: float
     n_arrows_in_same_line: int
     line_repeats_previous: bool
@@ -40,6 +42,8 @@ class ArrowDataPoint(AbstractArrowDataPoint):
         fts = [
             int(self.is_hold),
             int(len(self.active_hold_idxs) > 0),
+            int(self.same_line_as_next_datapoint),
+            self.time_since_last_same_arrow_use,
             self.time_since_prev_downpress, 
             self.n_arrows_in_same_line,
             int(self.line_repeats_previous),

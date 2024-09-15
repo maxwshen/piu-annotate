@@ -24,28 +24,42 @@ class ChartStructFeaturizer:
         self.cs = cs
         self.context_len = args.setdefault('ft.context_length', 20)
 
-        cs.annotate_time_since_downpress()
-        cs.annotate_line_repeats_previous()
-        cs.annotate_line_repeats_next()
+        self.cs.annotate_time_since_downpress()
+        self.cs.annotate_line_repeats_previous()
+        self.cs.annotate_line_repeats_next()
         self.pred_coords: list[PredictionCoordinate] = self.cs.get_prediction_coordinates()
 
         self.singles_or_doubles = cs.singles_or_doubles()
         self.points_nolimb = self.get_arrows_nolimb()
         self.pt_array = [pt.to_array() for pt in self.points_nolimb]
 
+        self.pc_idx_to_prev = self.cs.get_previous_used_pred_coord_for_arrow()
+        # shift by +1, and replace None with 0
+        shifted = [x if x is not None else -1 for x in self.pc_idx_to_prev.values()]
+        self.prev_pc_idx_shifted = np.array(shifted) + 1
+
     """
         Build
     """    
     def get_arrows_nolimb(self) -> list[ArrowDataPoint]:
         all_points_nolimb = []
-        for pred_coord in self.pred_coords:
+        pc_to_time_last_arrow_use = self.cs.get_time_since_last_same_arrow_use()
+        for idx, pred_coord in enumerate(self.pred_coords):
             row = self.cs.df.iloc[pred_coord.row_idx]
             line = row['Line with active holds'].replace('`', '')
+
+            same_line_as_next_datapoint = False
+            if idx + 1 < len(self.pred_coords):
+                if self.pred_coords[idx + 1].row_idx == pred_coord.row_idx:
+                    same_line_as_next_datapoint = True
+
             arrow_pos = pred_coord.arrow_pos
             point = ArrowDataPoint(
                 arrow_pos = arrow_pos,
                 is_hold = bool(line[arrow_pos] == '2'),
                 active_hold_idxs = [i for i, s in enumerate(line) if s in list('34')],
+                same_line_as_next_datapoint = same_line_as_next_datapoint,
+                time_since_last_same_arrow_use = pc_to_time_last_arrow_use[pred_coord],
                 time_since_prev_downpress = row['__time since prev downpress'],
                 n_arrows_in_same_line = line.count('1') + line.count('2'),
                 line_repeats_previous = row['__line repeats previous'],
@@ -92,7 +106,6 @@ class ChartStructFeaturizer:
         """
         padded_pts = self.get_padded_array()
         context_len = self.context_len
-
         c2_plus_1 = 2 * context_len + 1
         view = np.lib.stride_tricks.sliding_window_view(
             padded_pts, 
@@ -113,9 +126,9 @@ class ChartStructFeaturizer:
         """
         context_len = self.context_len
         c2_plus_1 = 2 * context_len + 1
-
         arrow_view = self.featurize_arrows_with_context()
 
+        # add feature for limb used for nearby arrows
         padded_limbs = np.concatenate([
             [-1]*context_len,
             limb_probs,
@@ -131,19 +144,36 @@ class ChartStructFeaturizer:
             limb_view[:, :context_len],
             limb_view[:, -context_len:]
         ], axis = 1)
-        array_view = np.concatenate([arrow_view, limb_view], axis = 1)
-        return array_view
+
+        # add feature for prev limb used for nearby arrows
+        shifted_limb_probs = np.concatenate([[-1], limb_probs])
+        # shift enables using value -1 for no previous
+        prev_limb_probs = shifted_limb_probs[self.prev_pc_idx_shifted]
+        prev_limb_feature_context_len = 8
+        padded_prev_limb_probs = np.concatenate([
+            [-1]*prev_limb_feature_context_len,
+            prev_limb_probs,
+            [-1]*prev_limb_feature_context_len,
+        ])
+        prev_limb_view = np.lib.stride_tricks.sliding_window_view(
+            padded_prev_limb_probs, 
+            (2*prev_limb_feature_context_len + 1), 
+            axis = 0
+        )
+        features = np.concatenate([arrow_view, limb_view, prev_limb_view], axis = 1)
+        return features
 
     """
         Evaluation
     """
-    def evaluate(self, pred_limbs: NDArray) -> dict[str, any]:
+    def evaluate(self, pred_limbs: NDArray, verbose: bool = False) -> dict[str, any]:
         """ Evaluate vs 'Limb annotation' column """
         labels = self.get_labels_from_limb_col('Limb annotation')
         eval_dict = {
-            'accuracy': np.sum(labels == pred_limbs) / len(labels), 
+            'accuracy': f'{np.sum(labels == pred_limbs) / len(labels):.2%}', 
             'error_idxs': np.where(labels != pred_limbs),
         }
-        for k, v in eval_dict.items():
-            logger.debug(f'{k}={v}')
+        if verbose:
+            for k, v in eval_dict.items():
+                logger.debug(f'{k}={v}')
         return eval_dict

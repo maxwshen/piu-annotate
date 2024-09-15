@@ -9,10 +9,12 @@ import itertools
 import numpy as np
 from operator import itemgetter
 import functools
+from collections import defaultdict
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
 from piu_annotate.ml.models import ModelSuite
+from piu_annotate.formats import notelines
 
 
 def apply_index(array, idxs):
@@ -57,6 +59,9 @@ class Actor:
         self.fcs = featurizers.ChartStructFeaturizer(self.cs)
     
     def score(self, pred_limbs: NDArray) -> float:
+        # log_probs = self.predict_arrow(logp = True)
+        # log_probs_labels = sum(apply_index(log_probs, pred_limbs))
+
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
         log_prob_labels_withlimb = sum(apply_index(log_probs_withlimb, pred_limbs))
 
@@ -132,13 +137,12 @@ class Actor:
     ) -> NDArray:
         """ Use parity prediction to find jack sections, and put best limb
         """
-        logger.info(f'Flipping jack sections ...')
         pred_matches_next = self.predict_matchnext()
         ranges = get_ranges(pred_matches_next, 1)
 
         orig_pred_limbs = pred_limbs.copy()
         new_pred_limbs = pred_limbs.copy()
-        for start, end in tqdm(ranges):
+        for start, end in ranges:
             exp_match_end = end + 1
             pred_subset = pred_limbs[start : exp_match_end]
             if len(set(pred_subset)) == 1:
@@ -160,6 +164,56 @@ class Actor:
                 new_pred_limbs[start : exp_match_end] = 1
 
         return new_pred_limbs
+
+    def fix_double_doublestep(self, pred_limbs: NDArray) -> NDArray:
+        """ Find and fix sections starting and ending with double step
+            where parity prediction strongly prefers alternating instead.
+        """
+        # find low-scoring doublesteps
+        start_threshold = np.log(0.5)
+        pred_matches_next = get_matches_next(pred_limbs)
+        match_logp = self.predict_matchnext(logp = True)
+        applied_logp = apply_index(match_logp, pred_matches_next)
+        start_cands = np.where(applied_logp < start_threshold)[0]
+
+        def try_flip(pred_limbs: NDArray, cand_idx: int):
+            start = cand_idx + 1
+            len_limit = 12
+
+            end_cands = start + np.where(applied_logp[start:start + len_limit] < -0.2)[0]
+            best_improvement = 0
+            base_score = self.score(pred_limbs)
+            best_limbs = pred_limbs
+            best_end = None
+            for end_idx in end_cands:
+                end = end_idx + 1
+                pl = pred_limbs.copy()
+                pl[start:end] = 1 - pl[start:end]
+                score = self.score(pl)
+
+                improvement = (score - base_score) / (end - start)
+                if improvement > best_improvement:
+                    best_improvement = improvement
+                    best_limbs = pl
+                    best_end = end
+
+            if best_improvement > 0.7:
+                return best_limbs, (start, best_end)
+            return pred_limbs, None
+
+        logger.debug(f'{start_cands=}')
+        n_flips = 0
+        flipped_ranges = []
+        while(len(start_cands) > 0):
+            pred_limbs, found_range = try_flip(pred_limbs, start_cands[0])
+            start_cands = start_cands[1:]
+            if found_range is not None:
+                n_flips += 1
+                flipped_ranges.append(found_range)
+
+        logger.debug(f'Flipped {n_flips} sections')
+        logger.debug(f'{flipped_ranges}')
+        return pred_limbs
 
     def beam_search(
         self, 
@@ -193,6 +247,44 @@ class Actor:
         scores = [self.score(pl) for pl in all_pred_limbs]
         best = max(scores)
         return all_pred_limbs[scores.index(best)]
+
+    def detect_impossible_multihit(self, pred_limbs: NDArray):
+        """ Find parts of `pred_limbs` implying physically impossible
+            limb combo to hit any single line with multiple downpresses
+        """
+        pred_limbs = pred_limbs.copy()
+        row_idx_to_pcs = defaultdict(list)
+        for pc_idx, pc in enumerate(self.pred_coords):
+            row_idx_to_pcs[pc.row_idx].append(pc_idx)
+        
+        n_lines_fixed = 0
+        for row_idx, pc_idxs in row_idx_to_pcs.items():
+            if len(pc_idxs) > 1:
+                pcs = [self.pred_coords[i] for i in pc_idxs]
+                limbs = pred_limbs[pc_idxs]
+
+                lefts = [pc.arrow_pos for pc, limb in zip(pcs, limbs) if limb == 0]
+                rights = [pc.arrow_pos for pc, limb in zip(pcs, limbs) if limb == 1]
+
+                left_ok = notelines.one_foot_multihit_possible(lefts)
+                right_ok = notelines.one_foot_multihit_possible(rights)
+
+                if not (left_ok and right_ok):
+                    n_lines_fixed += 1
+                    limb_combos = notelines.multihit_to_valid_limbs([pc.arrow_pos for pc in pcs])
+
+                    score_to_limbs = dict()
+                    for limb_combo in limb_combos:
+                        pl = pred_limbs.copy()
+                        for limb, pc_idx in zip(limb_combo, pc_idxs):
+                            pl[pc_idx] = limb
+                        score_to_limbs[self.score(pl)] = limb_combo
+                    best_combo = score_to_limbs[max(score_to_limbs)]
+
+                    for limb, pc_idx in zip(best_combo, pc_idxs):
+                        pred_limbs[pc_idx] = limb
+        logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
+        return pred_limbs
 
     """
         Model predictions

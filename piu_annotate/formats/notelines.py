@@ -2,6 +2,7 @@
     Logic re note lines from .ssc file
 """
 import re
+import itertools
 
 
 def get_limb_for_arrow_pos(
@@ -92,6 +93,59 @@ def frac_two_arrows_bracketable(lines: list[str]) -> float:
     two_arrow_lines = [line for line in tlines if line.count('1') == 2]
     num_bracketable = sum([l in bracketable_lines for l in two_arrow_lines])
     return num_bracketable / len(two_arrow_lines)
+
+
+bracketable_arrow_positions = [
+    [0, 2], [1, 2], [2, 3], [2, 4],
+    [5, 7], [6, 7], [7, 8], [7, 9],
+    [4, 5], [3, 6],
+]
+quads = [(b1, b2) for b1, b2 in itertools.combinations(bracketable_arrow_positions, 2)
+         if len(set(b1 + b2)) == 4]
+def one_foot_multihit_possible(arrow_positions: list[int]) -> bool:
+    """ Returns whether one foot can be used to hit all `arrow_positions`
+        at the same time.
+    """
+    if len(arrow_positions) > 2:
+        return False
+    if len(arrow_positions) <= 1:
+        return True
+    return sorted(arrow_positions) in bracketable_arrow_positions
+
+
+def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
+    """ Given `arrow_positions` for simultaneous downpresses,
+        returns a list of valid limb assignments represented as a tuple of ints.
+        Each output tuple has the same length as `arrow_positions`, and has elements
+        0 = left, 1 = right, for the i-th arrow position.
+    """
+    arrow_positions = sorted(arrow_positions)
+    if len(arrow_positions) == 2:
+        ok = [(0, 1), (1, 0)]
+        if arrow_positions in bracketable_arrow_positions:
+            ok += [(0, 0), (1, 1)]
+        return ok
+    if len(arrow_positions) == 3:
+        assignments = []
+        for b in bracketable_arrow_positions:
+            if all(pos in arrow_positions for pos in b):
+                assign = [0, 0, 0]
+                for pos in b:
+                    assign[arrow_positions.index(pos)] = 1
+                flipped = [1 - x for x in assign]
+                assignments += [assign, flipped]
+        return assignments
+    if len(arrow_positions) == 4:
+        # Valid quad must be two brackets
+        for b1, b2 in quads:
+            if sorted(b1 + b2) == arrow_positions:
+                assign = [0, 0, 0, 0]
+                for pos in b1:
+                    assign[arrow_positions.index(pos)] = 1
+                flipped = [1 - x for x in assign]
+                return [tuple(assign), tuple(flipped)]
+        return []
+    return []
 
 
 def add_active_holds(line: str, active_hold_idxs: set[str]) -> str:
