@@ -200,26 +200,65 @@ class ChartStruct:
         return {idx: pc_to_prev_idx[pc] for idx, pc in enumerate(pcs)}
 
     def add_limb_annotations(
-        self, 
+        self,
         pred_coords: list[PredictionCoordinate],
         limb_annots: list[str],
-        new_col: str,
+        new_col: str
     ) -> None:
         """ Populates `new_col` in df with `limb_annots` at `pred_coords`,
             for example predicted limb annotations.
+
+            Holds started with a limb will use that same limb throughout the hold
+            duration.
         """
         assert len(pred_coords) == len(limb_annots)
         self.init_limb_annotations(new_col)
 
-        # update
-        for pred_coord, new_limb in zip(pred_coords, limb_annots):
-            row_idx = pred_coord.row_idx
-            limb_idx = pred_coord.limb_idx
+        active_holds = {}   # arrowpos: limb
 
+        row_arrow_to_pc = {}
+        for pc in pred_coords:
+            row_arrow_to_pc[(pc.row_idx, pc.arrow_pos)] = pc
+
+        def update_limb_annot(row_idx: int, limb_idx: int, new_limb: str):
             prev_annot = self.df.iloc[row_idx][new_col]
             new_annot = prev_annot[:limb_idx] + new_limb + prev_annot[limb_idx + 1:]
             self.df.loc[row_idx, new_col] = new_annot
+            return
+
+
+        for row_idx, row in self.df.iterrows():
+            line = row['Line with active holds']
+
+            limb_idx = 0
+            for arrow_pos, sym in enumerate(line[1:]):
+                if is_active_symbol(sym):
+
+                    if sym in list('12'):
+                        # get new limb
+                        pc = row_arrow_to_pc[(row_idx, arrow_pos)]
+                        new_limb = limb_annots[pred_coords.index(pc)]
+
+                    if sym == '1':
+                        update_limb_annot(row_idx, limb_idx, new_limb)
+                    elif sym == '2':
+                        update_limb_annot(row_idx, limb_idx, new_limb)
+                        # add to active holds
+                        if arrow_pos not in active_holds:
+                            active_holds[arrow_pos] = new_limb
+                        else:
+                            logger.warning(f'WARNING: {arrow_pos=} in {active_holds=}')
+                            continue
+                    elif sym == '4':
+                        new_limb = active_holds[arrow_pos]
+                        update_limb_annot(row_idx, limb_idx, new_limb)
+                    elif sym == '3':
+                        new_limb = active_holds.pop(arrow_pos)
+                        update_limb_annot(row_idx, limb_idx, new_limb)
+
+                    limb_idx += 1
         return
+
 
     def init_limb_annotations(self, new_col: str) -> None:
         """ Initializes limb annotations to `new_col` as all ? """
@@ -451,13 +490,7 @@ class ChartStruct:
                             active_holds[arrow_pos] = (time, limb)
                         else:
                             logger.warning(f'WARNING: {arrow_pos=} in {active_holds=}')
-                            # logger.warning(f'Skipping line ...')
                             continue
-                        # try:
-                        #     assert arrow_pos not in active_holds
-                        # except:
-                        #     print(f'{arrow_pos=} not in {active_holds=}')
-                        #     import code; code.interact(local=dict(globals(), **locals()))
                     elif sym == '4':
                         # if limb changes, pop active hold and add new hold
                         active_limb = active_holds[arrow_pos][1]

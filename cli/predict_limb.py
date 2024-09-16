@@ -103,6 +103,10 @@ def main():
         pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
         cs.add_limb_annotations(pred_coords, pred_limb_strs, '__pred limb final')
 
+        cs.df['Error'] = (
+            cs.df['__pred limb final'] != cs.df['Limb annotation']
+        ).astype(int)
+
         basename = os.path.basename(args['chart_struct_csv'])
         out_fn = f'temp/{basename}'
         cs.to_csv(out_fn)
