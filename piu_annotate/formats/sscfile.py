@@ -107,7 +107,7 @@ class StepchartSSC(UserDict):
             self.data["DESCRIPTION"],
             self.data["SONGTYPE"],
         ]) 
-        return shortname.replace(' ', '_')
+        return shortname.replace(' ', '_').replace('/', '_')
 
     def validate(self) -> bool:
         required_keys = [

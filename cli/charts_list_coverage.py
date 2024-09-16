@@ -12,8 +12,10 @@ import difflib
 
 from piu_annotate.formats.arroweclipse import ArrowEclipseStepchartListJson, ArrowEclipseChartInfo
 from piu_annotate.formats.sscfile import SongSSC, StepchartSSC
+from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.crawl import crawl_stepcharts
 from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
+from piu_annotate.utils import make_dir
 
 
 def allowed_multimatch(ae_ci: ArrowEclipseChartInfo) -> bool:
@@ -70,8 +72,15 @@ def match_aeci_to_ssc(
     return matched_ssc, len(matched_ssc)
 
 
-def try_ssc_to_chartstruct(stepchart: StepchartSSC) -> str:
+def try_ssc_to_chartstruct(stepchart: StepchartSSC, out_folder: str) -> str:
+    out_file = os.path.join(out_folder, stepchart.shortname() + '.csv')
+    if os.path.isfile(out_file):
+        return 'success'
+
     cs_df, cs_message = stepchart_ssc_to_chartstruct(stepchart)
+    if cs_message == 'success':
+        cs = ChartStruct.from_stepchart_ssc(stepchart)
+        cs.to_csv(out_file)
     return cs_message
 
 
@@ -151,9 +160,11 @@ def main():
         3. Convert standard stepchartssc into chartstruct
     """
     # convert standard .ssc into chartstruct
+    out_chartstruct_folder = args['output_chartstruct_folder']
+    make_dir(out_chartstruct_folder)
     import multiprocessing as mp
     logger.info(f'Converting standard .ssc to chartstruct ...')
-    inputs = [[stepchart] for stepchart in standard_stepcharts]
+    inputs = [[stepchart, out_chartstruct_folder] for stepchart in standard_stepcharts]
     with mp.Pool(num_processes := 6) as pool:
         mp_cs_msg = pool.starmap(
             try_ssc_to_chartstruct,
@@ -161,6 +172,9 @@ def main():
         )
     for k, v in Counter(mp_cs_msg).items():
         logger.info(f'{k}: {v}')
+    # mp_cs_msg = []
+    # for input in tqdm(inputs):
+    #     try_ssc_to_chartstruct(*input)
 
     # build message to stepchartssc mapping
     cs_dd = defaultdict(list)
@@ -168,7 +182,7 @@ def main():
         if msg != 'success':
             cs_dd[msg].append(stepchart)
 
-    import code; code.interact(local=dict(globals(), **locals()))
+    logger.success('Done.')
     return
 
 
@@ -186,6 +200,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--simfiles_folder', 
         default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/'
+    )
+    parser.add_argument(
+        '--output_chartstruct_folder', 
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/'
     )
     args.parse_args(parser)
     main()
