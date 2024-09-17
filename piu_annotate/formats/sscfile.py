@@ -78,6 +78,22 @@ class StepchartSSC(UserDict):
             string = '\n'.join(f.readlines())
         return StepchartSSC(parse_ssc_to_dict(string))
 
+    @staticmethod
+    def from_song_ssc_file(song_ssc_file: str, description_songtype: str):
+        """ Gets StepChartSSC from `song_ssc_file` matching `description_songtype`,
+            for example "S16_ARCADE" or "D24_REMIX".
+        """
+        song = SongSSC(song_ssc_file, 'PLACEHOLDER_PACK_DONOTUSE')
+        all_desc_songtypes = []
+        for stepchart in song.stepcharts:
+            desc_songtypes = stepchart.data['DESCRIPTION'] + '_' + stepchart.data['SONGTYPE']
+            all_desc_songtypes.append(desc_songtypes)
+            if desc_songtypes == description_songtype:
+                return stepchart
+        logger.error(f'Failed to find {description_songtype=} in {song_ssc_file=}')
+        logger.error(f'Valid options are {all_desc_songtypes=}')
+        return None
+
     def to_file(self, filename: str) -> None:
         """ Writes to file """
         Path(os.path.dirname(filename)).mkdir(parents = True, exist_ok = True)
@@ -240,15 +256,12 @@ class SongSSC:
         self.ssc_file = ssc_file
         self.pack = pack
 
-        header, stepcharts = self.parse_song_ssc_file(self.ssc_file)
+        header, stepcharts = self.parse_song_ssc_file()
         self.header = header
         self.stepcharts = stepcharts
         self.validate()
 
-    def parse_song_ssc_file(
-        self, 
-        file_lines: str
-    ) -> tuple[HeaderSSC, list[StepchartSSC]]:
+    def parse_song_ssc_file(self) -> tuple[HeaderSSC, list[StepchartSSC]]:
         """ Parse song ssc file. Sections in file are delineated by #NOTEDATA:; """
         with open(self.ssc_file, 'r') as f:
             file_lines = f.readlines()

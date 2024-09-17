@@ -86,6 +86,7 @@ class ChartStruct:
         df, num_bad_lines = stepchart_ssc_to_chartstruct(stepchart_ssc)
         df['Line'] = [f'`{line}' for line in df['Line']]
         df['Line with active holds'] = [f'`{line}' for line in df['Line with active holds']]
+        df['Limb annotation'] = ['' for line in df['Line']]
         return ChartStruct(df)
     
     def validate(self) -> None:
@@ -363,6 +364,9 @@ class ChartStruct:
         chartjs: ChartJsStruct, 
         with_limb_annot: bool = True
     ) -> bool:
+        """ Computes if ChartStruct matches `chartjs` at all arrow times and positions.
+            If `with_limb_annot`, requires matching limb annotations too.
+        """
         self_cjs = ChartJsStruct.from_chartstruct(self)
         return self_cjs.matches(chartjs, with_limb_annot = with_limb_annot)
 
@@ -470,20 +474,27 @@ class ChartStruct:
     def get_arrow_hold_arts(self) -> tuple[list[ArrowArt], list[HoldArt]]:
         arrow_arts = []
         hold_arts = []
-        get_limb = lambda limbs, idx: limbs[idx] if len(limbs) > 0 else '?'
+
+        def get_limb(limbs: str | float, idx: int) -> str:
+            if type(limbs) == float or len(limbs) == 0:
+                return '?'
+            return limbs[idx]
+
         active_holds = {}   # arrowpos: (time start, limb)
-        for _, row in self.df.iterrows():
-            line = row['Line with active holds']
+        for row_idx, row in self.df.iterrows():
+            line = row['Line with active holds'].replace('`', '')
             limb_annot = row['Limb annotation']
             time = row['Time']
 
             n_active_symbols_seen = 0
-            for arrow_pos, sym in enumerate(line[1:]):
+            for arrow_pos, sym in enumerate(line):
                 if is_active_symbol(sym):
                     limb = get_limb(limb_annot, n_active_symbols_seen)
 
                     if sym == '1':
                         arrow_arts.append(ArrowArt(arrow_pos, time, limb))
+                        if arrow_pos in active_holds:
+                            raise Exception(f'1 in active hold at {row_idx=}, {arrow_pos=}')
                     elif sym == '2':
                         # add to active holds
                         if arrow_pos not in active_holds:

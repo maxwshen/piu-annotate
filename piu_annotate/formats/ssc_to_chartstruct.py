@@ -21,6 +21,7 @@ def edit_string(s: str, idx: int, c: chr) -> str:
 
 def stepchart_ssc_to_chartstruct(
     stepchart: StepchartSSC,
+    debug: bool = False,
 ) -> tuple[pd.DataFrame | None, str]:
     """ Builds df to create ChartStruct object.
         df has one row per "line" and 
@@ -113,7 +114,7 @@ def stepchart_ssc_to_chartstruct(
                 bad_line = True
                 num_bad_lines += 1
                 comment = 'Tried releasing non-existent hold'
-                line = edit_string(line, panel_idx, '0')
+                line_towrite = edit_string(line_towrite, panel_idx, '0')
                 aug_line = edit_string(aug_line, panel_idx, '0')
 
         # write
@@ -237,7 +238,7 @@ class BeatToValueDict(UserDict):
             key as starting beat, and value as length
         """
         for start_beat, length in self.data.items():
-            if start_beat < query_beat < start_beat + length:
+            if start_beat <= query_beat < start_beat + length:
                 return True
         return False
 

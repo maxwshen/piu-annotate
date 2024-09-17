@@ -153,7 +153,7 @@ def add_active_holds(line: str, active_hold_idxs: set[str]) -> str:
     aug_line = list(line)
     for panel_idx in active_hold_idxs:
         if aug_line[panel_idx] == '0':
-          aug_line[panel_idx] = '4'
+            aug_line[panel_idx] = '4'
         elif aug_line[panel_idx] in ['1', '2']:
             raise Exception('Error: Tried to place active hold 4 onto 1/2')
     return ''.join(aug_line)
