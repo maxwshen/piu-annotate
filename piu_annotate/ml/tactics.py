@@ -110,14 +110,14 @@ class Tactician:
         improves = self.label_flip_improvement(pred_limbs)
         cand_idxs = list(np.where(improves > 0)[0])
 
-        logger.debug(f'{cand_idxs}')
+        # logger.debug(f'{cand_idxs}')
         groups = group_list_consecutive(cand_idxs)
         reduced_idxs = []
         for start, end in groups:
             best_idx = start + np.argmax(improves[start:end])
             reduced_idxs.append(best_idx)
-        if len(reduced_idxs) > 0:
-            logger.debug(f'Found {len(reduced_idxs)} labels to flip')
+        # if len(reduced_idxs) > 0:
+            # logger.debug(f'Found {len(reduced_idxs)} labels to flip')
 
         new_labels = pred_limbs.copy()
         new_labels[reduced_idxs] = 1 - new_labels[reduced_idxs]
@@ -204,9 +204,9 @@ class Tactician:
                 n_flips += 1
                 flipped_ranges.append(found_range)
 
-        if n_flips > 0:
-            logger.debug(f'Flipped {n_flips} sections')
-            logger.debug(f'{flipped_ranges}')
+        # if n_flips > 0:
+        #     logger.debug(f'Flipped {n_flips} sections')
+        #     logger.debug(f'{flipped_ranges}')
         return pred_limbs
 
     def beam_search(
@@ -264,9 +264,12 @@ class Tactician:
                 right_ok = notelines.one_foot_multihit_possible(rights)
 
                 if not (left_ok and right_ok):
-                    n_lines_fixed += 1
                     limb_combos = notelines.multihit_to_valid_limbs([pc.arrow_pos for pc in pcs])
 
+                    if len(limb_combos) == 0:
+                        continue
+
+                    n_lines_fixed += 1
                     score_to_limbs = dict()
                     for limb_combo in limb_combos:
                         pl = pred_limbs.copy()
@@ -277,8 +280,8 @@ class Tactician:
 
                     for limb, pc_idx in zip(best_combo, pc_idxs):
                         pred_limbs[pc_idx] = limb
-        if n_lines_fixed > 0:
-            logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
+        # if n_lines_fixed > 0:
+            # logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
         return pred_limbs
 
     """

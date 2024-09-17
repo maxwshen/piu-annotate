@@ -3,6 +3,7 @@ from tqdm import tqdm
 from loguru import logger
 import math
 from dataclasses import dataclass
+import numpy as np
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
@@ -68,7 +69,10 @@ class ChartStruct:
 
     @staticmethod
     def from_file(csv_file: str):
-        return ChartStruct(pd.read_csv(csv_file))
+        df = pd.read_csv(csv_file, dtype = {'Limb annotation': str})
+        if type(df['Limb annotation'].iloc[0]) != str:
+            df['Limb annotation'] = ['' for i in range(len(df))]
+        return ChartStruct(df)
 
     def to_csv(self, filename: str):
         self.df.to_csv(filename)
@@ -476,7 +480,7 @@ class ChartStruct:
         hold_arts = []
 
         def get_limb(limbs: str | float, idx: int) -> str:
-            if type(limbs) == float or len(limbs) == 0:
+            if limbs == '':
                 return '?'
             return limbs[idx]
 

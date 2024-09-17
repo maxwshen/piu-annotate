@@ -1,6 +1,3 @@
-"""
-    Featurize
-"""
 import argparse
 import os
 from hackerargs import args
@@ -94,7 +91,7 @@ def main():
     model_suite = ModelSuite(singles_or_doubles)
 
     if not args['run_folder']:
-        cs = ChartStruct.from_file(args['chart_struct_csv'])
+        cs: ChartStruct = ChartStruct.from_file(args['chart_struct_csv'])
         cs, fcs, pred_limbs = predict(cs, model_suite, verbose = True)
 
         # annotate
@@ -139,7 +136,9 @@ def main():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description = """
+        Evaluates models on chart structs with existing limb annotations
+    """)
     parser.add_argument(
         '--chart_struct_csv', 
         default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Rising_Star_-_M2U_S17_arcade.csv',

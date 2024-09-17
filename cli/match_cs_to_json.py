@@ -22,22 +22,23 @@ def main():
     logger.info('Enumerating over manual json files ...')
     for json_file in tqdm(json_files):
         fms = difflib.get_close_matches(json_file, chartstruct_files)
-        cjs = ChartJsStruct.from_json(os.path.join(json_folder, json_file))
+        full_json_fn = os.path.join(json_folder, json_file)
+        cjs = ChartJsStruct.from_json(full_json_fn)
 
         json_to_candidates[json_file] = fms
 
         for match_csv in fms:
-            cs = ChartStruct.from_file(os.path.join(cs_folder, match_csv))
-
+            full_cs_fn = os.path.join(cs_folder, match_csv)
+            cs = ChartStruct.from_file(full_cs_fn)
+            exact_match = False
             try:
                 exact_match = cs.matches_chart_json(cjs, with_limb_annot = False)
             except Exception as e:
                 logger.error(str(e))
-                logger.error(os.path.join(cs_folder, match_csv))
+                logger.error(full_cs_fn)
+                exact_match = False
 
             if exact_match:
-                full_json_fn = os.path.join(json_folder, json_file)
-                full_cs_fn = os.path.join(cs_folder, match_csv)
                 json_to_csfn[full_json_fn] = full_cs_fn
     
     logger.info(f'Found {len(json_to_csfn)} matches out of {len(json_files)}')
