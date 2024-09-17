@@ -1,0 +1,1 @@
+# output folder should be /chart-json/, for compatibility with make_search_json.py
