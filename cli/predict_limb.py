@@ -90,7 +90,8 @@ def accuracy(fcs: featurizers.ChartStructFeaturizer, pred_limbs: NDArray):
 
 
 def main():
-    model_suite = ModelSuite()
+    singles_or_doubles = args['singles_or_doubles']
+    model_suite = ModelSuite(singles_or_doubles)
 
     if not args['run_folder']:
         cs = ChartStruct.from_file(args['chart_struct_csv'])

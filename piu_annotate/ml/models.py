@@ -40,23 +40,21 @@ class ModelWrapper:
 
 
 class ModelSuite:
-    def __init__(self):
+    def __init__(self, singles_or_doubles: str):
         """ Stores suite of ML models for limb prediction """
+        self.singles_or_doubles = singles_or_doubles
         model_type = args['model']
         assert model_type in supported_models, f'{model_type=} not in {supported_models=}'
         self.model_type = model_type
 
-        self.model_arrows_to_limb = self.load('model.arrows_to_limb')
-        self.model_arrowlimbs_to_limb = self.load('model.arrowlimbs_to_limb')
-        self.model_arrows_to_matchnext = self.load('model.arrows_to_matchnext')
-        self.model_arrows_to_matchprev = self.load('model.arrows_to_matchprev')
+        sd = self.singles_or_doubles
+        self.model_arrows_to_limb = self.load(f'model.arrows_to_limb-{sd}')
+        self.model_arrowlimbs_to_limb = self.load(f'model.arrowlimbs_to_limb-{sd}')
+        self.model_arrows_to_matchnext = self.load(f'model.arrows_to_matchnext-{sd}')
+        self.model_arrows_to_matchprev = self.load(f'model.arrows_to_matchprev-{sd}')
 
-    def load(self, arg_key: str) -> ModelWrapper:
-        if arg_key not in args:
-            logger.error(f'Failed to find {arg_key} in args')
-            exit(1)
-        
-        model_file = args[arg_key]
+    def load(self, model_name: str) -> ModelWrapper:
+        model_file = os.path.join(args['model.dir'], args[model_name])
         if self.model_type == 'lightgbm':
             model = LGBModel.load(model_file)
         return model
