@@ -20,7 +20,7 @@ from sklearn.model_selection import train_test_split
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
-from piu_annotate.ml.actors import Actor
+from piu_annotate.ml.tactics import Tactician
 from piu_annotate.ml.models import ModelSuite
 
 
@@ -29,8 +29,8 @@ def predict(
     model_suite: ModelSuite,
     verbose: bool = False,
 ) -> ChartStruct:
-    """ Use actor to predict limb annotations for `cs` """
-    actor = Actor(cs, model_suite)
+    """ Use tactician to predict limb annotations for `cs` """
+    tactics = Tactician(cs, model_suite)
     fcs = featurizers.ChartStructFeaturizer(cs)
 
     true_labels = fcs.get_labels_from_limb_col('Limb annotation')
@@ -39,37 +39,37 @@ def predict(
 
     # score true labels
     if verbose:
-        logger.info(f'Score of true labels: {actor.score(true_labels):.3f}')
+        logger.info(f'Score of true labels: {tactics.score(true_labels):.3f}')
 
-    pred_limbs = actor.iterative_refine()
-    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
+    pred_limbs = tactics.iterative_refine()
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
-        logger.info(f'Score, iterative refine: {actor.score(pred_limbs):.3f}')
+        logger.info(f'Score, iterative refine: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs)
 
-    pred_limbs = actor.flip_labels_by_score(pred_limbs)
-    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
+    pred_limbs = tactics.flip_labels_by_score(pred_limbs)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
-        logger.info(f'Score, flip: {actor.score(pred_limbs):.3f}')
+        logger.info(f'Score, flip: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs)
 
-    pred_limbs = actor.flip_jack_sections(pred_limbs)
-    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
+    pred_limbs = tactics.flip_jack_sections(pred_limbs)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
-        logger.info(f'Score, flip jacks: {actor.score(pred_limbs):.3f}')
+        logger.info(f'Score, flip jacks: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs)
 
-    pred_limbs = actor.beam_search(score_to_limbs[max(score_to_limbs)], width = 5, n_iter = 3)
-    score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
+    pred_limbs = tactics.beam_search(score_to_limbs[max(score_to_limbs)], width = 5, n_iter = 3)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
-        logger.info(f'Score, beam search: {actor.score(pred_limbs):.3f}')
+        logger.info(f'Score, beam search: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)
 
     for _ in range(1):
-        pred_limbs = actor.fix_double_doublestep(pred_limbs)
-        score_to_limbs[actor.score(pred_limbs)] = pred_limbs.copy()
+        pred_limbs = tactics.fix_double_doublestep(pred_limbs)
+        score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
         if verbose:
-            logger.info(f'Score, fix double doublestep: {actor.score(pred_limbs):.3f}')
+            logger.info(f'Score, fix double doublestep: {tactics.score(pred_limbs):.3f}')
             fcs.evaluate(pred_limbs, verbose = True)
 
     # best score
@@ -77,9 +77,9 @@ def predict(
         best_score = max(score_to_limbs.keys())
         logger.success(f'Found {best_score=:.3f}')
 
-    pred_limbs = actor.detect_impossible_multihit(score_to_limbs[max(score_to_limbs)])
+    pred_limbs = tactics.detect_impossible_multihit(score_to_limbs[max(score_to_limbs)])
     if verbose:
-        logger.info(f'Score, fix impossible multihit: {actor.score(pred_limbs):.3f}')
+        logger.info(f'Score, fix impossible multihit: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)
 
     return cs, fcs, pred_limbs

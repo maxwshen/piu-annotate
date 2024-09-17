@@ -48,10 +48,10 @@ def get_matches_prev(array: NDArray) -> NDArray:
     return np.concatenate([[False], array[1:] == array[:-1]]).astype(int)
 
 
-class Actor:
+class Tactician:
     def __init__(self, cs: ChartStruct, model_suite: ModelSuite):
-        """ Actor uses a suite of ML models to optimize predicted limb
-            annotations for a given ChartStruct.
+        """ Tactician uses a suite of ML models and a set of tactics to
+            optimize predicted limb annotations for a given ChartStruct.
         """
         self.cs = cs
         self.models = model_suite
