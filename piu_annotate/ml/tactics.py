@@ -99,17 +99,9 @@ class Tactician:
     """
         Limb prediction handling
     """
-    def iterative_refine(self, n_iter: int = 5) -> NDArray:
-        points = self.fcs.featurize_arrows_with_context()
-        pred_limb_p = self.models.model_arrows_to_limb.predict_proba(points)[:, -1]
-
-        for __i in range(n_iter):
-            weight = (__i + 1) / (n_iter + 1)
-            adj_limb_probs = weight * pred_limb_p + (1 - weight) * 0.5 * np.ones(pred_limb_p.shape)
-
-            points_wlimb = self.fcs.featurize_arrowlimbs_with_context(adj_limb_probs)
-            pred_limb_p = self.models.model_arrowlimbs_to_limb.predict_proba(points_wlimb)[:, -1]
-        return self.predict_arrowlimbs(pred_limb_p)
+    def initial_predict(self) -> NDArray:
+        pred_limbs = self.predict_arrow()
+        return self.predict_arrowlimbs(pred_limbs)
 
     def flip_labels_by_score(self, pred_limbs: NDArray) -> NDArray:
         """ Flips individual limbs by improvement score.
@@ -124,7 +116,8 @@ class Tactician:
         for start, end in groups:
             best_idx = start + np.argmax(improves[start:end])
             reduced_idxs.append(best_idx)
-        logger.debug(f'Found {len(reduced_idxs)} labels to flip')
+        if len(reduced_idxs) > 0:
+            logger.debug(f'Found {len(reduced_idxs)} labels to flip')
 
         new_labels = pred_limbs.copy()
         new_labels[reduced_idxs] = 1 - new_labels[reduced_idxs]
@@ -201,7 +194,7 @@ class Tactician:
                 return best_limbs, (start, best_end)
             return pred_limbs, None
 
-        logger.debug(f'{start_cands=}')
+        # logger.debug(f'{start_cands=}')
         n_flips = 0
         flipped_ranges = []
         while(len(start_cands) > 0):
@@ -211,8 +204,9 @@ class Tactician:
                 n_flips += 1
                 flipped_ranges.append(found_range)
 
-        logger.debug(f'Flipped {n_flips} sections')
-        logger.debug(f'{flipped_ranges}')
+        if n_flips > 0:
+            logger.debug(f'Flipped {n_flips} sections')
+            logger.debug(f'{flipped_ranges}')
         return pred_limbs
 
     def beam_search(
@@ -283,7 +277,8 @@ class Tactician:
 
                     for limb, pc_idx in zip(best_combo, pc_idxs):
                         pred_limbs[pc_idx] = limb
-        logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
+        if n_lines_fixed > 0:
+            logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
         return pred_limbs
 
     """
@@ -293,14 +288,14 @@ class Tactician:
     def predict_arrow(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
-            return self.models.model_arrows_to_limb.predict_log_proba(points)
+            return self.models.model_arrows_to_limb.predict_log_prob(points)
         else:
             return self.models.model_arrows_to_limb.predict(points)
 
     def predict_arrowlimbs(self, limb_array: NDArray, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrowlimbs_with_context(limb_array)
         if logp:
-            return self.models.model_arrowlimbs_to_limb.predict_log_proba(points)
+            return self.models.model_arrowlimbs_to_limb.predict_log_prob(points)
         else:
             return self.models.model_arrowlimbs_to_limb.predict(points)
 
@@ -308,7 +303,7 @@ class Tactician:
     def predict_matchnext(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
-            return self.models.model_arrows_to_matchnext.predict_log_proba(points)
+            return self.models.model_arrows_to_matchnext.predict_log_prob(points)
         else:
             return self.models.model_arrows_to_matchnext.predict(points)
 
@@ -316,6 +311,6 @@ class Tactician:
     def predict_matchprev(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
-            return self.models.model_arrows_to_matchprev.predict_log_proba(points)
+            return self.models.model_arrows_to_matchprev.predict_log_prob(points)
         else:
             return self.models.model_arrows_to_matchprev.predict(points)

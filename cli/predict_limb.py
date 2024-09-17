@@ -41,23 +41,23 @@ def predict(
     if verbose:
         logger.info(f'Score of true labels: {tactics.score(true_labels):.3f}')
 
-    pred_limbs = tactics.iterative_refine()
+    pred_limbs = tactics.initial_predict()
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
-        logger.info(f'Score, iterative refine: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs)
+        logger.info(f'Score, initial pred: {tactics.score(pred_limbs):.3f}')
+        fcs.evaluate(pred_limbs, verbose = True)
 
     pred_limbs = tactics.flip_labels_by_score(pred_limbs)
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
         logger.info(f'Score, flip: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs)
+        fcs.evaluate(pred_limbs, verbose = True)
 
     pred_limbs = tactics.flip_jack_sections(pred_limbs)
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
         logger.info(f'Score, flip jacks: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs)
+        fcs.evaluate(pred_limbs, verbose = True)
 
     pred_limbs = tactics.beam_search(score_to_limbs[max(score_to_limbs)], width = 5, n_iter = 3)
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
@@ -65,12 +65,11 @@ def predict(
         logger.info(f'Score, beam search: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)
 
-    for _ in range(1):
-        pred_limbs = tactics.fix_double_doublestep(pred_limbs)
-        score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
-        if verbose:
-            logger.info(f'Score, fix double doublestep: {tactics.score(pred_limbs):.3f}')
-            fcs.evaluate(pred_limbs, verbose = True)
+    pred_limbs = tactics.fix_double_doublestep(pred_limbs)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
+    if verbose:
+        logger.info(f'Score, fix double doublestep: {tactics.score(pred_limbs):.3f}')
+        fcs.evaluate(pred_limbs, verbose = True)
 
     # best score
     if verbose:
@@ -132,6 +131,8 @@ def main():
         stats_df = pd.DataFrame(dd)
         stats_df.to_csv('temp/stats.csv')
 
+        logger.info(stats_df['Accuracy'].describe())
+
     logger.success('Done.')
     return
 
@@ -158,6 +159,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/091324/singles/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/091624/model-config.yaml'
     )
     main()
