@@ -10,7 +10,8 @@ from pathlib import Path
 import numpy as np
 import pickle
 
-from sklearn.ensemble import GradientBoostingClassifier
+import lightgbm as lgb
+from lightgbm import Booster
 from sklearn.model_selection import train_test_split
 from numpy.typing import NDArray
 
@@ -21,6 +22,7 @@ from piu_annotate.ml import featurizers
 def create_dataset(
     csvs: list[str],
     get_label_func: callable,
+    use_limb_features: bool = False,
 ):
     singles_doubles = args.setdefault('singles_or_doubles', 'singles')
 
@@ -35,7 +37,11 @@ def create_dataset(
             # labels = fcs.get_label_matches_next('Limb annotation')
             # labels = fcs.get_label_matches_prev('Limb annotation')
             labels = get_label_func(fcs)
-            points = fcs.featurize_arrows_with_context()
+
+            if use_limb_features:
+                points = fcs.featurize_arrowlimbs_with_context(labels)
+            else:
+                points = fcs.featurize_arrows_with_context()
 
             all_points.append(points)
             all_labels.append(labels)
@@ -52,20 +58,27 @@ def train_model(points: NDArray, labels: NDArray):
     # train/test split
     train_x, test_x, train_y, test_y = train_test_split(points, labels)
 
-    model = GradientBoostingClassifier()
-    model.fit(train_x, train_y)
+    train_data = lgb.Dataset(train_x, label = train_y)
+    test_data = lgb.Dataset(test_x, label = test_y)
+    params = {'objective': 'binary', 'metric': 'binary_logloss'}
+    bst = lgb.train(params, train_data, valid_sets = [test_data])
 
-    print(model.score(train_x, train_y))
-    print(model.score(test_x, test_y))
-    return model
+    # train pred
+    train_pred = bst.predict(train_x).round()
+    print(sum(train_pred == train_y) / len(train_y))
+
+    test_pred = bst.predict(test_x).round()
+    print(sum(test_pred == test_y) / len(test_y))
+    return bst
 
 
-def save_model(model, name):
+def save_model(bst: Booster, name):
     out_dir = args.setdefault('out_dir', '/home/maxwshen/piu-annotate/artifacts/models/temp')
     singles_doubles = args.setdefault('singles_or_doubles', 'singles')
-    out_fn = os.path.join(out_dir, f'{singles_doubles}-{name}.pkl')
-    with open(out_fn, 'wb') as f:
-        pickle.dump(model, f)
+    out_fn = os.path.join(out_dir, f'{singles_doubles}-{name}.txt')
+
+    bst.save_model(out_fn)
+
     logger.info(f'Saved model to {out_fn}')
     return
 
@@ -79,6 +92,11 @@ def main():
     points, labels = create_dataset(csvs, label_func)
     model = train_model(points, labels)
     save_model(model, 'arrows_to_limb')
+
+    label_func = lambda fcs: fcs.get_labels_from_limb_col('Limb annotation')
+    points, labels = create_dataset(csvs, label_func, use_limb_features = True)
+    model = train_model(points, labels)
+    save_model(model, 'arrowlimbs_to_limb')
 
     label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
     points, labels = create_dataset(csvs, label_func)

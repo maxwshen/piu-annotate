@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from numpy.typing import NDArray
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from piu_annotate.formats import notelines
 
@@ -58,8 +59,8 @@ class LimbLabel:
 
     @staticmethod
     def from_limb_annot(annot: str):
-        assert annot in list('lr')
-        return LimbLabel(limb = 0) if annot == 'l' else LimbLabel(limb = 1)
+        mapper = {'l': 0, 'r': 1, 'h': 0}
+        return LimbLabel(limb = mapper[annot])
 
     def to_array(self) -> NDArray:
         return np.array(self.limb)

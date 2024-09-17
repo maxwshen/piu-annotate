@@ -74,8 +74,8 @@ def match_aeci_to_ssc(
 
 def try_ssc_to_chartstruct(stepchart: StepchartSSC, out_folder: str) -> str:
     out_file = os.path.join(out_folder, stepchart.shortname() + '.csv')
-    if os.path.isfile(out_file):
-        return 'success'
+    # if os.path.isfile(out_file):
+    #     return 'success'
 
     cs_df, cs_message = stepchart_ssc_to_chartstruct(stepchart)
     if cs_message == 'success':

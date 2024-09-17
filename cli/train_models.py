@@ -12,16 +12,17 @@ import pickle
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
+from numpy.typing import NDArray
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
 
 
-def main():
-    folder = args['chart_struct_folder']
-    csvs = [os.path.join(folder, fn) for fn in os.listdir(folder)
-            if fn.endswith('.csv')]
-
+def create_dataset(
+    csvs: list[str],
+    get_label_func: callable,
+    use_limb_features: bool = False,
+):
     singles_doubles = args.setdefault('singles_or_doubles', 'singles')
 
     all_points, all_labels = [], []
@@ -29,10 +30,17 @@ def main():
     for csv in tqdm(csvs):
         cs = ChartStruct.from_file(csv)
         if cs.singles_or_doubles() == singles_doubles:
-            
+
             fcs = featurizers.ChartStructFeaturizer(cs)
-            labels = fcs.get_labels_from_limb_col('Limb annotation')
-            points = fcs.featurize_arrowlimbs_with_context(labels)
+            # labels = fcs.get_labels_from_limb_col('Limb annotation')
+            # labels = fcs.get_label_matches_next('Limb annotation')
+            # labels = fcs.get_label_matches_prev('Limb annotation')
+            labels = get_label_func(fcs)
+
+            if use_limb_features:
+                points = fcs.featurize_arrowlimbs_with_context(labels)
+            else:
+                points = fcs.featurize_arrows_with_context()
 
             all_points.append(points)
             all_labels.append(labels)
@@ -42,11 +50,10 @@ def main():
     points = np.concatenate(all_points)
     labels = np.concatenate(all_labels)
     logger.info(f'Found dataset shape {points.shape}')
+    return points, labels
 
-    # cs = ChartStruct.from_file(args['chart_struct_csv'])
-    # points, labels = featurizers.featurize_chart_struct(cs)
-    # logger.info(f'Found {len(points)=}')
 
+def train_model(points: NDArray, labels: NDArray):
     # train/test split
     train_x, test_x, train_y, test_y = train_test_split(points, labels)
 
@@ -55,12 +62,43 @@ def main():
 
     print(model.score(train_x, train_y))
     print(model.score(test_x, test_y))
+    return model
 
+
+def save_model(model, name):
     out_dir = args.setdefault('out_dir', '/home/maxwshen/piu-annotate/artifacts/models/temp')
-    out_fn = os.path.join(out_dir, f'{singles_doubles}-arrowlimbs_to_limb.pkl')
+    singles_doubles = args.setdefault('singles_or_doubles', 'singles')
+    out_fn = os.path.join(out_dir, f'{singles_doubles}-{name}.pkl')
     with open(out_fn, 'wb') as f:
         pickle.dump(model, f)
     logger.info(f'Saved model to {out_fn}')
+    return
+
+
+def main():
+    folder = args['chart_struct_folder']
+    csvs = [os.path.join(folder, fn) for fn in os.listdir(folder)
+            if fn.endswith('.csv')]
+
+    label_func = lambda fcs: fcs.get_labels_from_limb_col('Limb annotation')
+    points, labels = create_dataset(csvs, label_func)
+    model = train_model(points, labels)
+    save_model(model, 'arrows_to_limb')
+
+    label_func = lambda fcs: fcs.get_labels_from_limb_col('Limb annotation')
+    points, labels = create_dataset(csvs, label_func, use_limb_features = True)
+    model = train_model(points, labels)
+    save_model(model, 'arrowlimbs_to_limb')
+
+    label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
+    points, labels = create_dataset(csvs, label_func)
+    model = train_model(points, labels)
+    save_model(model, 'arrows_to_matchnext')
+
+    label_func = lambda fcs: fcs.get_label_matches_prev('Limb annotation')
+    points, labels = create_dataset(csvs, label_func)
+    model = train_model(points, labels)
+    save_model(model, 'arrows_to_matchprev')
 
     logger.success('Done.')
     return
