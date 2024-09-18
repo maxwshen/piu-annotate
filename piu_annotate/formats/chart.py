@@ -31,7 +31,7 @@ class PredictionCoordinate:
 
 
 class ChartStruct:
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, metadata: str = ''):
         """ Primary dataframe representation of a chart.
             One row per "line"
 
@@ -66,13 +66,16 @@ class ChartStruct:
         """
         self.df = df
         # self.validate()
+        self.metadata = metadata
 
     @staticmethod
     def from_file(csv_file: str):
         df = pd.read_csv(csv_file, dtype = {'Limb annotation': str})
         if type(df['Limb annotation'].iloc[0]) != str:
             df['Limb annotation'] = ['' for i in range(len(df))]
-        return ChartStruct(df)
+        df['Limb annotation'] = [x if type(x) != float else ''
+                                 for x in df['Limb annotation']]
+        return ChartStruct(df, metadata = csv_file)
 
     def to_csv(self, filename: str):
         self.df.to_csv(filename)

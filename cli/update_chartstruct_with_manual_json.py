@@ -1,6 +1,3 @@
-"""
-    Updates ChartStruct using a manually annotated chart json
-"""
 import argparse
 import os
 from hackerargs import args
@@ -30,7 +27,9 @@ def main():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description = """
+        Updates ChartStruct using a manually annotated chart json
+    """)
     parser.add_argument(
         '--chart_json', 
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/piucenter-070824-v1/Clematis_Rapsodia_-_Jehezukiel_S22_arcade.json',

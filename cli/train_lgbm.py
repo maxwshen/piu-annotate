@@ -69,7 +69,6 @@ def train_model(points: NDArray, labels: NDArray):
 
     test_pred = bst.predict(test_x).round()
     print(sum(test_pred == test_y) / len(test_y))
-    import code; code.interact(local=dict(globals(), **locals()))
     return bst
 
 

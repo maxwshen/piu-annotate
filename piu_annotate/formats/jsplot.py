@@ -78,6 +78,10 @@ class ChartJsStruct:
         self.json_struct = self.get_json_struct()
 
     def matches(self, other: ChartJsStruct, with_limb_annot: bool = False) -> bool:
+        if not len(self.arrow_arts) == len(other.arrow_arts):
+            return False
+        if not len(self.hold_arts) == len(other.hold_arts):
+            return False
         aas_match = [aa.matches(other_aa, with_limb_annot)
                      for aa, other_aa in zip(self.arrow_arts, other.arrow_arts)]
         has_match = [ha.matches(other_ha, with_limb_annot)
