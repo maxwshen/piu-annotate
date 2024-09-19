@@ -56,7 +56,7 @@ def create_dataset(
 
 def train_model(points: NDArray, labels: NDArray):
     # train/test split
-    train_x, test_x, train_y, test_y = train_test_split(points, labels)
+    train_x, test_x, train_y, test_y = train_test_split(points, labels, test_size = 0.1)
 
     train_data = lgb.Dataset(train_x, label = train_y)
     test_data = lgb.Dataset(test_x, label = test_y)
