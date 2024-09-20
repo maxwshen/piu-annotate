@@ -169,8 +169,10 @@ class ChartStructFeaturizer:
     def evaluate(self, pred_limbs: NDArray, verbose: bool = False) -> dict[str, any]:
         """ Evaluate vs 'Limb annotation' column """
         labels = self.get_labels_from_limb_col('Limb annotation')
+        accuracy = np.sum(labels == pred_limbs) / len(labels)
         eval_dict = {
-            'accuracy': f'{np.sum(labels == pred_limbs) / len(labels):.2%}', 
+            'accuracy-float': accuracy, 
+            'accuracy': f'{accuracy:.2%}', 
             'error_idxs': np.where(labels != pred_limbs),
         }
         if verbose:

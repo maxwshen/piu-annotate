@@ -84,9 +84,17 @@ def save_model(bst: Booster, name):
 
 
 def main():
-    folder = args['chart_struct_folder']
-    csvs = [os.path.join(folder, fn) for fn in os.listdir(folder)
-            if fn.endswith('.csv')]
+    folder = args['manual_chart_struct_folder']
+    
+    # crawl all subdirs for csvs
+    csvs = []
+    dirpaths = set()
+    for dirpath, _, files in os.walk(folder):
+        for file in files:
+            if file.endswith('.csv'):
+                csvs.append(os.path.join(dirpath, file))
+                dirpaths.add(dirpath)
+    logger.info(f'Found {len(csvs)} csvs in {len(dirpaths)} directories ...')
 
     label_func = lambda fcs: fcs.get_labels_from_limb_col('Limb annotation')
     points, labels = create_dataset(csvs, label_func)
@@ -113,14 +121,13 @@ def main():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    # parser.add_argument(
-    #     '--chart_struct_csv', 
-    #     default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
-    # )
+    parser = argparse.ArgumentParser(description = """
+        Train LightGBM model suite on chart struct with manual limb annotations.
+    """)
     parser.add_argument(
-        '--chart_struct_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/',
+        '--manual_chart_struct_folder', 
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/',
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/',
     )
     args.parse_args(parser)
     main()

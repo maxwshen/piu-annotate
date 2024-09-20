@@ -83,7 +83,7 @@ def predict(
 
 def accuracy(fcs: featurizers.ChartStructFeaturizer, pred_limbs: NDArray):
     eval_d = fcs.evaluate(pred_limbs, verbose = False)
-    return eval_d['accuracy']
+    return eval_d['accuracy-float']
 
 
 def main():
@@ -110,10 +110,20 @@ def main():
         logger.info(f'Saved to {out_fn}')
 
     else:
-        csv_folder = args['chart_struct_csv_folder']
+        csv_folder = args['manual_chart_struct_folder']
         singles_or_doubles = args['singles_or_doubles']
-        csvs = [os.path.join(csv_folder, fn) for fn in os.listdir(csv_folder)
-                if fn.endswith('.csv')]
+
+        # crawl all subdirs for csvs
+        csvs = []
+        dirpaths = set()
+        for dirpath, _, files in os.walk(csv_folder):
+            for file in files:
+                if file.endswith('.csv'):
+                    csvs.append(os.path.join(dirpath, file))
+                    dirpaths.add(dirpath)
+        logger.info(f'Found {len(csvs)} csvs in {len(dirpaths)} directories ...')
+        # csvs = [os.path.join(csv_folder, fn) for fn in os.listdir(csv_folder)
+        #         if fn.endswith('.csv')]
         
         dd = defaultdict(list)
         for csv in tqdm(csvs):
@@ -127,7 +137,7 @@ def main():
             dd['Accuracy'].append(accuracy(fcs, pred_limbs))
 
         stats_df = pd.DataFrame(dd)
-        stats_df.to_csv('temp/stats.csv')
+        stats_df.to_csv(f'temp/stats-{singles_or_doubles}.csv')
 
         logger.info(stats_df['Accuracy'].describe())
 
@@ -141,13 +151,14 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Rising_Star_-_M2U_S17_arcade.csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/Headless_Chicken_-_r300k_S21_arcade.csv'
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/091924/Indestructible_-_Matduke_D22_ARCADE.csv'
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Rising_Star_-_M2U_S17_arcade.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Headless_Chicken_-_r300k_S21_arcade.csv'
     )
     parser.add_argument(
-        '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-manual-090624/',
+        '--manual_chart_struct_folder', 
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/',
     )
     parser.add_argument(
         '--singles_or_doubles', 
@@ -159,6 +170,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/091624/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/091924/model-config.yaml'
     )
     main()

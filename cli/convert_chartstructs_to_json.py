@@ -9,6 +9,12 @@ from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats.jsplot import ChartJsStruct
 
 
+def make_basename_url_safe(text: str) -> str:
+    """ Makes a basename safe for URL. Removes / too. """
+    ok = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:?#[]@!$&()*+,;=')
+    return ''.join([c for c in text if c in ok])
+
+
 # output folder should be /chart-json/, for compatibility with make_search_json.py
 def main():
     folder = args['chartstruct_csv_folder']
@@ -21,7 +27,8 @@ def main():
     logger.info(f'Writing to {out_dir=}')
 
     for csv in tqdm(csvs):
-        out_fn = os.path.join(out_dir, os.path.basename(csv).replace('.csv', '.json'))
+        basename = make_basename_url_safe(os.path.basename(csv).replace('.csv', '.json'))
+        out_fn = os.path.join(out_dir, basename)
         if os.path.isfile(out_fn):
             continue
 
@@ -39,7 +46,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chartstruct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/lgbm-091624',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/lgbm-091924',
     )
     args.parse_args(parser)
     main()
