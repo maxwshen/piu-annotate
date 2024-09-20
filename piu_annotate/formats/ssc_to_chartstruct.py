@@ -47,8 +47,9 @@ def stepchart_ssc_to_chartstruct(
     beat_to_lines = b2l.beat_to_lines
 
     # aggregate all beats where anything happens
-    beat_dicts = [warps, beat_to_bpm, stops, delays, fakes, beat_to_lines]
-    all_beats = itertools.chain.from_iterable([list(d.keys()) for d in beat_dicts])
+    all_beats = list(beat_to_lines.keys())
+    for bd in [warps, beat_to_bpm, stops, delays, fakes]:
+        all_beats += bd.get_event_times()
     beats = sorted(list(set(all_beats)))
 
     # setup initial conditions
@@ -241,4 +242,11 @@ class BeatToValueDict(UserDict):
             if start_beat <= query_beat < start_beat + length:
                 return True
         return False
+
+    def get_event_times(self) -> list[float]:
+        """ Get list of all times where anything happens """
+        events = []
+        for start, length in self.data.items():
+            events += [start, start + length]
+        return list(set(events))
 

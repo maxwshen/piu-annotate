@@ -54,11 +54,12 @@ if __name__ == '__main__':
         '--song_ssc_file', 
         # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/12 - PRIME/1430 - Scorpion King/1430 - Scorpion King.ssc'
         # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/13 - PRIME 2/1594 - Cross Time/1594 - Cross Time.ssc'
-        default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1689 - Over The Horizon/1689 - Over The Horizon.ssc'
+        # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1689 - Over The Horizon/1689 - Over The Horizon.ssc'
+        default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1695 - Phalanx RS2018 edit/1695 - Phalanx RS2018 edit.ssc'
     )
     parser.add_argument(
         '--description_songtype',
-        default = 'S11_ARCADE',
+        default = 'D21_ARCADE',
     )
     args.parse_args(parser)
     main()
