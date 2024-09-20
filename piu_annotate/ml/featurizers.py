@@ -30,8 +30,8 @@ class ChartStructFeaturizer:
         self.pred_coords: list[PredictionCoordinate] = self.cs.get_prediction_coordinates()
 
         self.singles_or_doubles = cs.singles_or_doubles()
-        self.points_nolimb = self.get_arrows_nolimb()
-        self.pt_array = [pt.to_array() for pt in self.points_nolimb]
+        self.arrowdatapoints = self.get_arrowdatapoints()
+        self.pt_array = [pt.to_array() for pt in self.arrowdatapoints]
 
         self.pc_idx_to_prev = self.cs.get_previous_used_pred_coord_for_arrow()
         # shift by +1, and replace None with 0
@@ -41,12 +41,13 @@ class ChartStructFeaturizer:
     """
         Build
     """    
-    def get_arrows_nolimb(self) -> list[ArrowDataPoint]:
-        all_points_nolimb = []
+    def get_arrowdatapoints(self) -> list[ArrowDataPoint]:
+        all_arrowdatapoints = []
         pc_to_time_last_arrow_use = self.cs.get_time_since_last_same_arrow_use()
         for idx, pred_coord in enumerate(self.pred_coords):
             row = self.cs.df.iloc[pred_coord.row_idx]
             line = row['Line with active holds'].replace('`', '')
+            line_is_bracketable = notelines.line_is_bracketable(line)
 
             same_line_as_next_datapoint = False
             if idx + 1 < len(self.pred_coords):
@@ -62,12 +63,13 @@ class ChartStructFeaturizer:
                 time_since_last_same_arrow_use = pc_to_time_last_arrow_use[pred_coord],
                 time_since_prev_downpress = row['__time since prev downpress'],
                 n_arrows_in_same_line = line.count('1') + line.count('2'),
+                line_is_bracketable = line_is_bracketable,
                 line_repeats_previous = row['__line repeats previous'],
                 line_repeats_next = row['__line repeats next'],
                 singles_or_doubles = self.singles_or_doubles,
             )
-            all_points_nolimb.append(point)
-        return all_points_nolimb
+            all_arrowdatapoints.append(point)
+        return all_arrowdatapoints
 
     def get_labels_from_limb_col(self, limb_col: str) -> NDArray:
         all_labels = []

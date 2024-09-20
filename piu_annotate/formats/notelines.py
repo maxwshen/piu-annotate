@@ -3,6 +3,7 @@
 """
 import re
 import itertools
+import functools
 
 
 def get_limb_for_arrow_pos(
@@ -146,6 +147,15 @@ def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
                 return [tuple(assign), tuple(flipped)]
         return []
     return []
+
+
+@functools.cache
+def line_is_bracketable(line: str) -> bool:
+    """ Returns whether `line` is bracketable, counting all downpresses (1-4).
+    """
+    line = line.replace('`', '')
+    downpress_idxs = [i for i, x in enumerate(line) if x != '0']
+    return bool(len(multihit_to_valid_limbs(downpress_idxs)))
 
 
 def add_active_holds(line: str, active_hold_idxs: set[str]) -> str:

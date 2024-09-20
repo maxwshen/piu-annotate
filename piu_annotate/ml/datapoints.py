@@ -25,6 +25,7 @@ class ArrowDataPoint(AbstractArrowDataPoint):
     time_since_last_same_arrow_use: float
     time_since_prev_downpress: float
     n_arrows_in_same_line: int
+    line_is_bracketable: bool
     line_repeats_previous: bool
     line_repeats_next: bool
     singles_or_doubles: str
@@ -47,6 +48,7 @@ class ArrowDataPoint(AbstractArrowDataPoint):
             self.time_since_last_same_arrow_use,
             self.time_since_prev_downpress, 
             self.n_arrows_in_same_line,
+            int(self.line_is_bracketable),
             int(self.line_repeats_previous),
             int(self.line_repeats_next),
         ]
