@@ -66,15 +66,22 @@ class HoldArt:
 
 
 class ChartJsStruct:
-    def __init__(self, arrow_arts: list[ArrowArt], hold_arts: list[HoldArt]):
+    def __init__(
+        self, 
+        arrow_arts: list[ArrowArt], 
+        hold_arts: list[HoldArt],
+        metadata: dict[str, any],
+    ):
         """ Data structure for chart, for javascript visualization use.
 
             Fields
             - ArrowArts
             - HoldArts
+            - Metadata
         """
         self.arrow_arts = arrow_arts
         self.hold_arts = hold_arts
+        self.metadata = metadata
         self.json_struct = self.get_json_struct()
 
     def matches(self, other: ChartJsStruct, with_limb_annot: bool = False) -> bool:
@@ -96,7 +103,8 @@ class ChartJsStruct:
 
     @staticmethod
     def from_chartstruct(cs: ChartStruct):
-        return ChartJsStruct(*cs.get_arrow_hold_arts())
+        arrow_arts, hold_arts = cs.get_arrow_hold_arts()
+        return ChartJsStruct(arrow_arts, hold_arts, cs.metadata)
 
     @staticmethod
     def from_json(json_file: str):
@@ -104,7 +112,8 @@ class ChartJsStruct:
             json_struct = json.load(f)
         arrow_arts = [ArrowArt.from_tuple(t) for t in json_struct[0]]
         hold_arts = [HoldArt.from_tuple(t) for t in json_struct[1]]
-        return ChartJsStruct(arrow_arts, hold_arts)
+        metadata = json_struct[2]
+        return ChartJsStruct(arrow_arts, hold_arts, metadata)
 
     def get_json_struct(self):
         """ Get representation in terms of lists and basic objects.
@@ -115,6 +124,7 @@ class ChartJsStruct:
         return (
             [art.to_tuple() for art in self.arrow_arts],
             [art.to_tuple() for art in self.hold_arts],
+            self.metadata
         )
 
     def to_json(self, filename: str):

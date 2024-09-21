@@ -15,7 +15,7 @@ from piu_annotate.formats.sscfile import SongSSC, StepchartSSC
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.crawl import crawl_stepcharts
 from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
-from piu_annotate.utils import make_dir
+from piu_annotate.utils import make_dir, make_basename_url_safe
 
 
 def allowed_multimatch(ae_ci: ArrowEclipseChartInfo) -> bool:
@@ -73,7 +73,8 @@ def match_aeci_to_ssc(
 
 
 def try_ssc_to_chartstruct(stepchart: StepchartSSC, out_folder: str) -> str:
-    out_file = os.path.join(out_folder, stepchart.shortname() + '.csv')
+    basename = make_basename_url_safe(stepchart.shortname() + '.csv')
+    out_file = os.path.join(out_folder, basename)
     # if os.path.isfile(out_file):
     #     return 'success'
 

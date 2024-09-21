@@ -5,7 +5,7 @@ from loguru import logger
 from pathlib import Path
 
 from piu_annotate.formats import notelines
-
+from piu_annotate.utils import make_basename_url_safe
 
 def parse_ssc_to_dict(string: str) -> dict[str, str]:
     """ Parses string into `#{KEY}:{VALUE}; dict """
@@ -119,11 +119,22 @@ class StepchartSSC(UserDict):
 
     def shortname(self) -> str:
         shortname = '_'.join([
-            f'{self.data["TITLE"]} - {self.data["ARTIST"]}',
+            f'{self.data["TITLE"]}',
+            # f'{self.data["TITLE"]} - {self.data["ARTIST"]}',
             self.data["DESCRIPTION"],
             self.data["SONGTYPE"],
         ]) 
-        return shortname.replace(' ', '_').replace('/', '_')
+        return make_basename_url_safe(shortname.replace(' ', '_').replace('/', '_'))
+
+    def get_metadata(self) -> dict[str, any]:
+        """ Gets metadata to store in ChartStruct and ChartJson.
+            Exclude keys with potentially very long values.
+        """
+        exclude = ['NOTES', 'SPEEDS', 'SCROLLS', 'TICKCOUNTS', 'BGCHANGES',
+                   'RADARVALUES', 'STOPS', 'DELAYS', 'WARPS', 'FAKES', 'BPMS']
+        metadata = {k: v for k, v in self.data.items() if k not in exclude and v != ''}
+        metadata['shortname'] = self.shortname()
+        return metadata
 
     def validate(self) -> bool:
         required_keys = [

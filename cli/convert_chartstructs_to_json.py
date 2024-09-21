@@ -7,12 +7,7 @@ from pathlib import Path
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats.jsplot import ChartJsStruct
-
-
-def make_basename_url_safe(text: str) -> str:
-    """ Makes a basename safe for URL. Removes / too. """
-    ok = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:?#[]@!$&()*+,;=')
-    return ''.join([c for c in text if c in ok])
+from piu_annotate.utils import make_basename_url_safe
 
 
 # output folder should be /chart-json/, for compatibility with make_search_json.py

@@ -4,6 +4,7 @@ from loguru import logger
 import math
 from dataclasses import dataclass
 import numpy as np
+import json
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
@@ -31,7 +32,7 @@ class PredictionCoordinate:
 
 
 class ChartStruct:
-    def __init__(self, df: pd.DataFrame, metadata: str = ''):
+    def __init__(self, df: pd.DataFrame):
         """ Primary dataframe representation of a chart.
             One row per "line"
 
@@ -57,8 +58,10 @@ class ChartStruct:
                     = Number of non-0 symbols in `Line with active holds`:
                       limb per symbol in same order.
                     = 0: (blank) equivalent to ? * (n. non-0 symbols)
-        
-            Intended features
+            Metadata (optional)
+                One entry only; json text of metadata dict.
+                    
+            Features and uses
             - Load from old d_annotate format (with foot annotations)
             - Load from .ssc file (with or without foot annotations)
             - Convert ChartStruct to ChartJSStruct for visualization
@@ -66,7 +69,10 @@ class ChartStruct:
         """
         self.df = df
         # self.validate()
-        self.metadata = metadata
+        if 'Metadata' in self.df.columns:
+            self.metadata = json.loads(self.df['Metadata'][0])
+        else:
+            self.metadata = dict()
 
     @staticmethod
     def from_file(csv_file: str):
@@ -75,10 +81,14 @@ class ChartStruct:
             df['Limb annotation'] = ['' for i in range(len(df))]
         df['Limb annotation'] = [x if type(x) != float else ''
                                  for x in df['Limb annotation']]
-        return ChartStruct(df, metadata = csv_file)
+        return ChartStruct(df)
 
-    def to_csv(self, filename: str):
+    def to_csv(self, filename: str) -> None:
+        metadata_json = json.dumps(self.metadata)
+        if 'Metadata' not in self.df.columns or self.df['Metadata'][0] != metadata_json:
+            self.df['Metadata'] = [metadata_json] + ['' for line in range(len(self.df)-1)]
         self.df.to_csv(filename)
+        return
 
     @staticmethod
     def from_piucenterdataframe(pc_df: PiuCenterDataFrame):
@@ -90,10 +100,12 @@ class ChartStruct:
     
     @staticmethod
     def from_stepchart_ssc(stepchart_ssc: StepchartSSC):
-        df, num_bad_lines = stepchart_ssc_to_chartstruct(stepchart_ssc)
+        df, message = stepchart_ssc_to_chartstruct(stepchart_ssc)
         df['Line'] = [f'`{line}' for line in df['Line']]
         df['Line with active holds'] = [f'`{line}' for line in df['Line with active holds']]
         df['Limb annotation'] = ['' for line in df['Line']]
+        metadata_json = json.dumps(stepchart_ssc.get_metadata())
+        df['Metadata'] = [metadata_json] + ['' for line in range(len(df)-1)]
         return ChartStruct(df)
     
     def validate(self) -> None:
@@ -266,7 +278,6 @@ class ChartStruct:
 
                     limb_idx += 1
         return
-
 
     def init_limb_annotations(self, new_col: str) -> None:
         """ Initializes limb annotations to `new_col` as all ? """
