@@ -204,7 +204,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--output_chartstruct_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/'
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/'
     )
     args.parse_args(parser)
     main()

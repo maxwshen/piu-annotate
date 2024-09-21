@@ -112,7 +112,10 @@ class ChartJsStruct:
             json_struct = json.load(f)
         arrow_arts = [ArrowArt.from_tuple(t) for t in json_struct[0]]
         hold_arts = [HoldArt.from_tuple(t) for t in json_struct[1]]
-        metadata = json_struct[2]
+        if len(json_struct) == 3:
+            metadata = json_struct[2]
+        else:
+            metadata = {}
         return ChartJsStruct(arrow_arts, hold_arts, metadata)
 
     def get_json_struct(self):

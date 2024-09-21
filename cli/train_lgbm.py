@@ -91,7 +91,7 @@ def main():
     dirpaths = set()
     for dirpath, _, files in os.walk(folder):
         for file in files:
-            if file.endswith('.csv'):
+            if file.endswith('.csv') and 'exclude' not in dirpath:
                 csvs.append(os.path.join(dirpath, file))
                 dirpaths.add(dirpath)
     logger.info(f'Found {len(csvs)} csvs in {len(dirpaths)} directories ...')

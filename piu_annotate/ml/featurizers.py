@@ -33,6 +33,8 @@ class ChartStructFeaturizer:
         self.arrowdatapoints = self.get_arrowdatapoints()
         self.pt_array = [pt.to_array() for pt in self.arrowdatapoints]
 
+        self.chart_metadata_features = self.get_chart_metadata_features()
+
         self.pc_idx_to_prev = self.cs.get_previous_used_pred_coord_for_arrow()
         # shift by +1, and replace None with 0
         shifted = [x if x is not None else -1 for x in self.pc_idx_to_prev.values()]
@@ -89,6 +91,13 @@ class ChartStructFeaturizer:
         labels = self.get_labels_from_limb_col(limb_col)
         return np.concatenate([[False], labels[1:] == labels[:-1]]).astype(int)
 
+    def get_chart_metadata_features(self) -> NDArray:
+        """ Builds NDArray of features for a chart, which are constant
+            for all arrowdatapoints in the same chart.
+        """
+        level = int(self.cs.metadata['METER'])
+        return np.array([level])
+
     """
         Featurize
     """
@@ -116,7 +125,12 @@ class ChartStructFeaturizer:
         )
         (N, D, c2_plus_1) = view.shape
         view = np.reshape(view, (N, D*c2_plus_1))
-        return view
+
+        # append chart-level features
+        cmf = np.repeat(self.chart_metadata_features.reshape(-1, 1), N, axis = 0)
+        # shaped into (N, d)
+        all_x = np.concatenate((view, cmf), axis = 1)
+        return all_x
 
     def featurize_arrowlimbs_with_context(self, limb_probs: NDArray) -> NDArray:
         """ Include `limb_probs` as features.

@@ -26,6 +26,7 @@ def main():
     logger.info(f'Found {len(chart_jsons)} in {chart_json_folder=}')
 
     failures = []
+    success = 0
     for chart_json_basename in tqdm(chart_jsons):
         chart_csv_file = chart_json_basename.replace('.json', '.csv')
         out_fn = os.path.join(output_folder, chart_csv_file)
@@ -39,6 +40,9 @@ def main():
         chart_struct_csv = os.path.join(cs_folder, chart_csv_file)
         if not os.path.isfile(chart_struct_csv):
             matches = difflib.get_close_matches(chart_json_basename, chartstruct_files)
+            if len(matches) == 0:
+                logger.warning(f'Did not find any matching CSVs ...')
+                continue
             chart_struct_csv = matches[0]
             logger.warning(f'CSV not found; using {chart_struct_csv} instead ...')
             chart_struct_csv = os.path.join(cs_folder, chart_struct_csv)
@@ -48,12 +52,17 @@ def main():
         if not cs.matches_chart_json(chart_json):
             logger.error(f'Failed: {chart_json_basename}')
             failures.append(chart_json_basename)
+            continue
         
         cs.to_csv(out_fn)
+        success += 1
 
     if failures:
         for basename in failures:
             logger.warning(f'Failed: {basename}')
+
+    logger.info(f'Found {success} successes')
+    logger.info(f'Found {len(failures)} failures')
 
     logger.success('done')
     return
@@ -65,17 +74,17 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_json_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/manual-annot-091724/',
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/manual-annot-091924/',
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/manual-annot-091724/',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/piucenter-070824-v1/',
     )
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/piucenter-dijkstra-090124/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/',
     )
     parser.add_argument(
         '--output_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/091924/',
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092124/',
     )
     args.parse_args(parser)
     main()

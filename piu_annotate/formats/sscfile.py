@@ -119,8 +119,7 @@ class StepchartSSC(UserDict):
 
     def shortname(self) -> str:
         shortname = '_'.join([
-            f'{self.data["TITLE"]}',
-            # f'{self.data["TITLE"]} - {self.data["ARTIST"]}',
+            f'{self.data["TITLE"]} - {self.data["ARTIST"]}',
             self.data["DESCRIPTION"],
             self.data["SONGTYPE"],
         ]) 
