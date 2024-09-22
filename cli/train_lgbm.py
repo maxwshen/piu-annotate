@@ -74,6 +74,7 @@ def create_dataset(
     labels = np.concatenate(all_labels)
     logger.info(f'Found dataset shape {points.shape}')
 
+    logger.info(f'Converting np array to scipy sparse ...')
     sparse_points = sparse.csr_matrix(points)
 
     result = (sparse_points, labels, feature_names)

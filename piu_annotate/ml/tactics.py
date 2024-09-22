@@ -59,9 +59,6 @@ class Tactician:
         self.fcs = featurizers.ChartStructFeaturizer(self.cs)
     
     def score(self, pred_limbs: NDArray) -> float:
-        # log_probs = self.predict_arrow(logp = True)
-        # log_probs_labels = sum(apply_index(log_probs, pred_limbs))
-
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
         log_prob_labels_withlimb = sum(apply_index(log_probs_withlimb, pred_limbs))
 

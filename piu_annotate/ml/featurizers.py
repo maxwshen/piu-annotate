@@ -63,6 +63,7 @@ class ChartStructFeaturizer:
             point = ArrowDataPoint(
                 arrow_pos = arrow_pos,
                 is_hold = bool(line[arrow_pos] == '2'),
+                line_with_active_holds = line,
                 active_hold_idxs = [i for i, s in enumerate(line) if s in list('34')],
                 same_line_as_next_datapoint = same_line_as_next_datapoint,
                 time_since_last_same_arrow_use = pc_to_time_last_arrow_use[pred_coord],
