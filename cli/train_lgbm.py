@@ -9,22 +9,42 @@ from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 import pickle
+import hashlib
+import gzip
 
 import lightgbm as lgb
 from lightgbm import Booster
 from sklearn.model_selection import train_test_split
 from numpy.typing import NDArray
+from scipy import sparse
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
+from piu_annotate.ml.datapoints import ArrowDataPoint
+
+
+def md5_hash(tup) -> str:
+    return hashlib.md5(pickle.dumps(tup)).hexdigest()
 
 
 def create_dataset(
     csvs: list[str],
     get_label_func: callable,
+    dataset_name: str,
     use_limb_features: bool = False,
 ):
     singles_doubles = args.setdefault('singles_or_doubles', 'singles')
+
+    # get hash
+    hashid = md5_hash(( tuple(sorted(csvs)), dataset_name, use_limb_features, singles_doubles ))
+
+    # try to load dataset
+    dataset_storage = args.setdefault('dataset_storage', '/home/maxwshen/piu-annotate/cli/temp/dataset-storage/')
+    storage_file = os.path.join(dataset_storage, f'{hashid}.pkl.gz')
+    if os.path.isfile(storage_file) and not args.setdefault('rebuild_datasets', False):
+        logger.info(f'Loading from {storage_file} ...')
+        with gzip.open(storage_file, 'rb') as f:
+            return pickle.load(f)
 
     all_points, all_labels = [], []
     n_csvs = 0
@@ -40,8 +60,10 @@ def create_dataset(
 
             if use_limb_features:
                 points = fcs.featurize_arrowlimbs_with_context(labels)
+                feature_names = fcs.get_arrowlimb_context_feature_names()
             else:
                 points = fcs.featurize_arrows_with_context()
+                feature_names = fcs.get_arrow_context_feature_names()
 
             all_points.append(points)
             all_labels.append(labels)
@@ -51,15 +73,40 @@ def create_dataset(
     points = np.concatenate(all_points)
     labels = np.concatenate(all_labels)
     logger.info(f'Found dataset shape {points.shape}')
-    return points, labels
+
+    sparse_points = sparse.csr_matrix(points)
+
+    result = (sparse_points, labels, feature_names)
+
+    with gzip.open(storage_file, 'wb') as f:
+        pickle.dump(result, f)
+    logger.info(f'Stored dataset into {storage_file}')
+
+    return result
 
 
-def train_model(points: NDArray, labels: NDArray):
+def train_categorical_model(
+    points: sparse.spmatrix, 
+    labels: NDArray, 
+    feature_names: list[str]
+):
     # train/test split
-    train_x, test_x, train_y, test_y = train_test_split(points, labels, test_size = 0.1)
-
-    train_data = lgb.Dataset(train_x, label = train_y)
-    test_data = lgb.Dataset(test_x, label = test_y)
+    train_x, test_x, train_y, test_y = train_test_split(
+        points, labels, test_size = 0.1, random_state = 0
+    )
+    
+    train_data = lgb.Dataset(
+        train_x, 
+        label = train_y, 
+        feature_name = feature_names,
+        categorical_feature = [fn for fn in feature_names if fn.startswith('cat.')],
+    )
+    test_data = lgb.Dataset(
+        test_x, 
+        label = test_y,
+        feature_name = feature_names,
+        categorical_feature = [fn for fn in feature_names if fn.startswith('cat.')],
+    )
     params = {'objective': 'binary', 'metric': 'binary_logloss'}
     bst = lgb.train(params, train_data, valid_sets = [test_data])
 
@@ -97,23 +144,23 @@ def main():
     logger.info(f'Found {len(csvs)} csvs in {len(dirpaths)} directories ...')
 
     label_func = lambda fcs: fcs.get_labels_from_limb_col('Limb annotation')
-    points, labels = create_dataset(csvs, label_func)
-    model = train_model(points, labels)
+    points, labels, feature_names = create_dataset(csvs, label_func, 'arrows_to_limb')
+    model = train_categorical_model(points, labels, feature_names)
     save_model(model, 'arrows_to_limb')
 
     label_func = lambda fcs: fcs.get_labels_from_limb_col('Limb annotation')
-    points, labels = create_dataset(csvs, label_func, use_limb_features = True)
-    model = train_model(points, labels)
+    points, labels, feature_names = create_dataset(csvs, label_func, 'arrowlimbs_to_limb', use_limb_features = True)
+    model = train_categorical_model(points, labels, feature_names)
     save_model(model, 'arrowlimbs_to_limb')
 
     label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
-    points, labels = create_dataset(csvs, label_func)
-    model = train_model(points, labels)
+    points, labels, feature_names = create_dataset(csvs, label_func, 'matchnext')
+    model = train_categorical_model(points, labels, feature_names)
     save_model(model, 'arrows_to_matchnext')
 
     label_func = lambda fcs: fcs.get_label_matches_prev('Limb annotation')
-    points, labels = create_dataset(csvs, label_func)
-    model = train_model(points, labels)
+    points, labels, feature_names = create_dataset(csvs, label_func, 'matchprev')
+    model = train_categorical_model(points, labels, feature_names)
     save_model(model, 'arrows_to_matchprev')
 
     logger.success('Done.')

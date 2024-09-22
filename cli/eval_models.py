@@ -118,7 +118,7 @@ def main():
         dirpaths = set()
         for dirpath, _, files in os.walk(csv_folder):
             for file in files:
-                if file.endswith('.csv'):
+                if file.endswith('.csv') and 'exclude' not in dirpath:
                     csvs.append(os.path.join(dirpath, file))
                     dirpaths.add(dirpath)
         logger.info(f'Found {len(csvs)} csvs in {len(dirpaths)} directories ...')
@@ -170,6 +170,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/091924/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/092124/model-config.yaml'
     )
     main()

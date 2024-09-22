@@ -141,7 +141,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124',
     )
     parser.add_argument(
         '--singles_or_doubles', 
@@ -149,6 +149,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/091924/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/092124/model-config.yaml'
     )
     main()

@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 from loguru import logger
 from hackerargs import args
 import functools
+import os
 
 from piu_annotate.formats.chart import ChartStruct, PredictionCoordinate
 from piu_annotate.formats import notelines
@@ -23,6 +24,7 @@ class ChartStructFeaturizer:
         """
         self.cs = cs
         self.context_len = args.setdefault('ft.context_length', 20)
+        self.prev_limb_feature_context_len = 8
 
         self.cs.annotate_time_since_downpress()
         self.cs.annotate_line_repeats_previous()
@@ -31,7 +33,8 @@ class ChartStructFeaturizer:
 
         self.singles_or_doubles = cs.singles_or_doubles()
         self.arrowdatapoints = self.get_arrowdatapoints()
-        self.pt_array = [pt.to_array() for pt in self.arrowdatapoints]
+        self.pt_array = [pt.to_array_categorical() for pt in self.arrowdatapoints]
+        self.pt_feature_names = self.arrowdatapoints[0].get_feature_names_categorical()
 
         self.chart_metadata_features = self.get_chart_metadata_features()
 
@@ -95,7 +98,7 @@ class ChartStructFeaturizer:
         """ Builds NDArray of features for a chart, which are constant
             for all arrowdatapoints in the same chart.
         """
-        level = int(self.cs.metadata['METER'])
+        level = self.cs.get_chart_level()
         return np.array([level])
 
     """
@@ -105,7 +108,8 @@ class ChartStructFeaturizer:
     def get_padded_array(self) -> NDArray:
         pt_array = self.pt_array
         context_len = self.context_len
-        empty_pt = np.zeros(len(pt_array[0]))
+        empty_pt = np.ones(len(pt_array[0])) * -1
+        empty_pt.fill(np.nan)
         return np.array([empty_pt]*context_len + pt_array + [empty_pt]*context_len)
 
     @functools.cache
@@ -124,13 +128,23 @@ class ChartStructFeaturizer:
             axis = 0
         )
         (N, D, c2_plus_1) = view.shape
-        view = np.reshape(view, (N, D*c2_plus_1))
+        view = np.reshape(view, (N, D*c2_plus_1), order = 'F')
 
         # append chart-level features
         cmf = np.repeat(self.chart_metadata_features.reshape(-1, 1), N, axis = 0)
         # shaped into (N, d)
         all_x = np.concatenate((view, cmf), axis = 1)
         return all_x
+
+    def get_arrow_context_feature_names(self) -> list[str]:
+        """ Must be aligned with featurize_arrows_with_context """
+        fnames = self.pt_feature_names
+        all_feature_names = []
+        for context_pos in range(-self.context_len, self.context_len + 1):
+            all_feature_names += [f'{fn}-{context_pos}' for fn in fnames]
+        all_feature_names += ['chart_level']
+        assert len(all_feature_names) == self.featurize_arrows_with_context().shape[-1]
+        return all_feature_names
 
     def featurize_arrowlimbs_with_context(self, limb_probs: NDArray) -> NDArray:
         """ Include `limb_probs` as features.
@@ -165,19 +179,33 @@ class ChartStructFeaturizer:
         shifted_limb_probs = np.concatenate([[-1], limb_probs])
         # shift enables using value -1 for no previous
         prev_limb_probs = shifted_limb_probs[self.prev_pc_idx_shifted]
-        prev_limb_feature_context_len = 8
         padded_prev_limb_probs = np.concatenate([
-            [-1]*prev_limb_feature_context_len,
+            [-1] * self.prev_limb_feature_context_len,
             prev_limb_probs,
-            [-1]*prev_limb_feature_context_len,
+            [-1] * self.prev_limb_feature_context_len,
         ])
         prev_limb_view = np.lib.stride_tricks.sliding_window_view(
             padded_prev_limb_probs, 
-            (2*prev_limb_feature_context_len + 1), 
+            (2 * self.prev_limb_feature_context_len + 1), 
             axis = 0
         )
         features = np.concatenate([arrow_view, limb_view, prev_limb_view], axis = 1)
         return features
+
+    def get_arrowlimb_context_feature_names(self) -> list[str]:
+        """ Must be aligned with featurize_arrows_with_context """
+        fnames = self.get_arrow_context_feature_names()
+
+        # add limb feature for nearby arrows
+        fnames += [f'limb_nearby_arrow_{idx}' for idx in range(self.context_len * 2)]
+
+        # add limb feature for previous limb used for nearby arrows
+        fnames += [f'prev_limb_nearby_arrow_{idx}'
+                   for idx in range(2 * self.prev_limb_feature_context_len + 1)]
+
+        __fake_limb_probs = np.ones((len(self.pt_array)))
+        assert len(fnames) == self.featurize_arrowlimbs_with_context(__fake_limb_probs).shape[-1]
+        return fnames
 
     """
         Evaluation

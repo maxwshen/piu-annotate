@@ -5,6 +5,7 @@ import math
 from dataclasses import dataclass
 import numpy as np
 import json
+import os
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
@@ -32,7 +33,7 @@ class PredictionCoordinate:
 
 
 class ChartStruct:
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, source_file: str = ''):
         """ Primary dataframe representation of a chart.
             One row per "line"
 
@@ -68,6 +69,7 @@ class ChartStruct:
             - Featurize ChartStruct, for ML annotation of feet
         """
         self.df = df
+        self.source_file = source_file
         # self.validate()
         if 'Metadata' in self.df.columns:
             self.metadata = json.loads(self.df['Metadata'][0])
@@ -81,7 +83,7 @@ class ChartStruct:
             df['Limb annotation'] = ['' for i in range(len(df))]
         df['Limb annotation'] = [x if type(x) != float else ''
                                  for x in df['Limb annotation']]
-        return ChartStruct(df)
+        return ChartStruct(df, source_file = csv_file)
 
     def to_csv(self, filename: str) -> None:
         metadata_json = json.dumps(self.metadata)
@@ -158,6 +160,22 @@ class ChartStruct:
             return 'singles'
         elif len(line) == 10:
             return 'doubles'
+
+    def get_chart_level(self) -> int:
+        if 'METER' in self.metadata:
+            level_str = int(self.metadata['METER'])
+        else:
+            # attempt to get level from filename
+            basename = os.path.basename(self.source_file)
+            maybe_level = basename.split('_')[-2]
+            for prefix in ['S', 'HD', 'D']:
+                maybe_level = maybe_level.replace(prefix, '')
+            level_str = int(maybe_level)
+        try:
+            return int(level_str)
+        except:
+            logger.warning(f'Failed to parse chart level')
+            return -1
 
     """
         Prediction
