@@ -65,9 +65,9 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--description_songtype',
-        # default = 'D21_ARCADE',
-        # default = 'S8_ARCADE',
         default = 'D19_REMIX',
+        # default = 'S8_ARCADE',
+        # default = 'D21_ARCADE',
     )
     args.parse_args(parser)
     main()

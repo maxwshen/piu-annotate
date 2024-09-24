@@ -53,7 +53,7 @@ def stepchart_ssc_to_chartstruct(
     beats = sorted(list(set(all_beats)))
 
     in_warp = lambda beat: warps.beat_in_any_range(beat, inclusive_end = False)
-    in_fake = lambda beat: fakes.beat_in_any_range(beat)
+    in_fake = lambda beat: fakes.beat_in_any_range(beat, inclusive_end = False)
     in_fake_or_warp = lambda beat: in_warp(beat) or in_fake(beat)
 
     if debug:
@@ -67,6 +67,7 @@ def stepchart_ssc_to_chartstruct(
 
     empty_line = b2l.get_empty_line()
     active_holds = set()
+    fake_holds = set()
     num_bad_lines = 0
     dd = defaultdict(list)
     for beat_idx, beat in enumerate(beats):
@@ -99,30 +100,14 @@ def stepchart_ssc_to_chartstruct(
             num_bad_lines += 1
             comment = str(e)
 
-        # if we will enter fake or warp, end active holds in written line
-        if in_fake_or_warp(next_beat) and not in_fake_or_warp(beat):
-            if len(active_holds) > 0:
-                for panel_idx in active_holds:
-                    line_towrite = edit_string(line_towrite, panel_idx, '3')
-                    aug_line = edit_string(aug_line, panel_idx, '3')
-
-        # if we leave fake or warp, restart holds in written line
-        if not in_fake_or_warp(beat) and in_fake_or_warp(prev_beat):
-            if len(active_holds) > 0:
-                for panel_idx in active_holds:
-                    line_towrite = edit_string(line_towrite, panel_idx, '2')
-                    aug_line = edit_string(aug_line, panel_idx, '2')
-
-        # Check that we are not releasing non-existent holds
         panel_idx_to_action = notelines.panel_idx_to_action(line)
         for panel_idx, action in panel_idx_to_action.items():
-            if action == '3' and panel_idx not in active_holds:
-                # Tried to release hold that doesn't exist
-                bad_line = True
-                num_bad_lines += 1
-                comment = 'Tried releasing non-existent hold'
-                line_towrite = edit_string(line_towrite, panel_idx, '0')
-                aug_line = edit_string(aug_line, panel_idx, '0')
+            if action == '3':
+                if panel_idx not in active_holds:
+                    # Tried to release hold that does not exist
+                    # this happens when hold starts in fake or warp
+                    line_towrite = edit_string(line_towrite, panel_idx, '0')
+                    aug_line = edit_string(aug_line, panel_idx, '0')
 
         # write
         if not in_fake_or_warp(beat) and line_towrite != empty_line:
@@ -137,15 +122,45 @@ def stepchart_ssc_to_chartstruct(
             for k, v in d.items():
                 dd[k].append(v)
 
+        if in_fake_or_warp(beat):
+            """ If in fake or warp and line has hold releases,
+                write a line with only the hold releases
+            """
+            end_hold_aug_line = notelines.add_active_holds(empty_line, active_holds)
+            for panel_idx, action in panel_idx_to_action.items():
+                if action == '3':
+                    if panel_idx in active_holds:
+                        end_hold_aug_line = edit_string(end_hold_aug_line, panel_idx, '3')
+            if '3' in end_hold_aug_line:
+                d = {
+                    'Time': time,
+                    'Beat': beat,
+                    'Line': end_hold_aug_line.replace('3', '0'),
+                    'Line with active holds': end_hold_aug_line,
+                    'Limb annotation': '',
+                    'Comment': comment,
+                }
+                for k, v in d.items():
+                    dd[k].append(v)
+
+
         # Update active holds
         if not bad_line:
             for panel_idx, action in panel_idx_to_action.items():
                 if action == '2':
-                    active_holds.add(panel_idx)
+                    if not in_fake_or_warp(beat):
+                        # only start holds if not in fake or warp
+                        active_holds.add(panel_idx)
                 if action == '3':
                     if panel_idx in active_holds:
                         active_holds.remove(panel_idx)
         # end note logic
+
+        # if beat == 455.25:
+        # if beat >= 87.5:
+            # if line != empty_line:
+                # logger.debug(f'{beat=}, {active_holds=}, {line=}, {line_towrite=}, {aug_line=}')
+                # import code; code.interact(local=dict(globals(), **locals()))
 
         # Update time if not in warp
         beat_increment = next_beat - beat
