@@ -190,8 +190,9 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description = """
-            Check how many charts in `charts_list_json` (officially accessible
-            stepcharts) are covered by .ssc files in `simfiles_folder`.
+            Use `charts_list_json` (officially accessible
+            stepcharts) to select .ssc files in `simfiles_folder`,
+            then convert .ssc to chartstructs.
         """
     )
     parser.add_argument(
