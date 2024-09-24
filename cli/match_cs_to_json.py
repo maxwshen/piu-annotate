@@ -12,20 +12,29 @@ from piu_annotate.formats.chart import ChartStruct
 
 def main():
     cs_folder = args['chartstruct_csv_folder']
-    json_folder = args['json_folder']
-
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
-    json_files = [fn for fn in os.listdir(json_folder) if fn.endswith('.json')]
+
+    json_folder = args['manual_json_folder']
+    # json_files = [fn for fn in os.listdir(json_folder) if fn.endswith('.json')]
+    # crawl all subdirs for jsons
+    json_files = []
+    dirpaths = set()
+    for dirpath, _, files in os.walk(json_folder):
+        for file in files:
+            if file.endswith('.json') and 'exclude' not in dirpath:
+                json_files.append(os.path.join(dirpath, file))
+                dirpaths.add(dirpath)
+    logger.info(f'Found {len(json_files)} jsons in {len(dirpaths)} directories ...')
 
     json_to_candidates = dict()
     json_to_csfn = dict()
     logger.info('Enumerating over manual json files ...')
-    for json_file in tqdm(json_files):
-        fms = difflib.get_close_matches(json_file, chartstruct_files)
-        full_json_fn = os.path.join(json_folder, json_file)
+    for full_json_fn in tqdm(json_files):
+        json_basename = os.path.basename(full_json_fn)
+        fms = difflib.get_close_matches(json_basename, chartstruct_files)
         cjs = ChartJsStruct.from_json(full_json_fn)
 
-        json_to_candidates[json_file] = fms
+        json_to_candidates[json_basename] = fms
 
         for match_csv in fms:
             full_cs_fn = os.path.join(cs_folder, match_csv)
@@ -40,7 +49,7 @@ def main():
 
             if exact_match:
                 json_to_csfn[full_json_fn] = full_cs_fn
-    
+
     logger.info(f'Found {len(json_to_csfn)} matches out of {len(json_files)}')
 
     # save dict
@@ -70,11 +79,11 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--chartstruct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/'
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/'
     )
     parser.add_argument(
-        '--json_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/piucenter-070824-v1/'
+        '--manual_json_folder', 
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/'
     )
     args.parse_args(parser)
     main()

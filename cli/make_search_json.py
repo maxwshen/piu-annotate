@@ -33,7 +33,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--chart_json_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/lgbm-091924/chart-json/'
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/lgbm-092124/chart-json/'
     )
     args.parse_args(parser)
     main()

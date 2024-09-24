@@ -18,6 +18,18 @@ from piu_annotate.ml.models import ModelSuite
 from piu_annotate.formats.jsplot import ChartJsStruct
 from piu_annotate.utils import make_dir
 
+
+def guess_singles_or_doubles_from_filename(filename: str) -> str:
+    """ """
+    basename = os.path.basename(filename)
+    sord = basename.split('_')[-2][0]
+    if sord == 'S':
+        return 'singles'
+    elif sord == 'D':
+        return 'doubles'
+    return 'unsure'
+
+
 def predict(
     cs: ChartStruct, 
     model_suite: ModelSuite,
@@ -83,7 +95,10 @@ def main():
 
     csvs = [os.path.join(csv_folder, fn) for fn in os.listdir(csv_folder)
             if fn.endswith('.csv')]
-    logger.info(f'Found {len(csvs)} csvs')
+    # subset csvs to singles or doubles
+    csv_sord = [csv for csv in csvs
+                if guess_singles_or_doubles_from_filename(csv) in [singles_or_doubles, 'unsure']]
+    logger.info(f'Found {len(csv_sord)} csvs')
 
     # load __cs_to_manual_json.yaml
     cs_to_manual_fn = os.path.join(csv_folder, '__cs_to_manual_json.yaml')
@@ -96,7 +111,7 @@ def main():
         os.makedirs(out_dir)
 
     stats = defaultdict(int)
-    for csv in tqdm(csvs):
+    for csv in tqdm(csv_sord):
         cs: ChartStruct = ChartStruct.from_file(csv)
         if cs.singles_or_doubles() != singles_or_doubles:
             continue

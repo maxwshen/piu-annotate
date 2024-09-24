@@ -27,6 +27,17 @@ def md5_hash(tup) -> str:
     return hashlib.md5(pickle.dumps(tup)).hexdigest()
 
 
+def guess_singles_or_doubles_from_filename(filename: str) -> str:
+    """ """
+    basename = os.path.basename(filename)
+    sord = basename.split('_')[-2][0]
+    if sord == 'S':
+        return 'singles'
+    elif sord == 'D':
+        return 'doubles'
+    return 'unsure'
+
+
 def create_dataset(
     csvs: list[str],
     get_label_func: callable,
@@ -46,28 +57,33 @@ def create_dataset(
         with gzip.open(storage_file, 'rb') as f:
             return pickle.load(f)
 
+    # subset csvs to singles or doubles
+    csv_sord = [csv for csv in csvs
+                if guess_singles_or_doubles_from_filename(csv) in [singles_doubles, 'unsure']]
+
     all_points, all_labels = [], []
     n_csvs = 0
-    for csv in tqdm(csvs):
+    for csv in tqdm(csv_sord):
         cs = ChartStruct.from_file(csv)
-        if cs.singles_or_doubles() == singles_doubles:
+        if cs.singles_or_doubles() != singles_doubles:
+            continue
 
-            fcs = featurizers.ChartStructFeaturizer(cs)
-            # labels = fcs.get_labels_from_limb_col('Limb annotation')
-            # labels = fcs.get_label_matches_next('Limb annotation')
-            # labels = fcs.get_label_matches_prev('Limb annotation')
-            labels = get_label_func(fcs)
+        fcs = featurizers.ChartStructFeaturizer(cs)
+        # labels = fcs.get_labels_from_limb_col('Limb annotation')
+        # labels = fcs.get_label_matches_next('Limb annotation')
+        # labels = fcs.get_label_matches_prev('Limb annotation')
+        labels = get_label_func(fcs)
 
-            if use_limb_features:
-                points = fcs.featurize_arrowlimbs_with_context(labels)
-                feature_names = fcs.get_arrowlimb_context_feature_names()
-            else:
-                points = fcs.featurize_arrows_with_context()
-                feature_names = fcs.get_arrow_context_feature_names()
+        if use_limb_features:
+            points = fcs.featurize_arrowlimbs_with_context(labels)
+            feature_names = fcs.get_arrowlimb_context_feature_names()
+        else:
+            points = fcs.featurize_arrows_with_context()
+            feature_names = fcs.get_arrow_context_feature_names()
 
-            all_points.append(points)
-            all_labels.append(labels)
-            n_csvs += 1
+        all_points.append(points)
+        all_labels.append(labels)
+        n_csvs += 1
     logger.info(f'Featurized {n_csvs} ChartStruct csvs ...')
 
     points = np.concatenate(all_points)

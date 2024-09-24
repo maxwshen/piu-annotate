@@ -23,6 +23,7 @@ class ArrowDataPoint(AbstractArrowDataPoint):
     line_with_active_holds: str
     active_hold_idxs: list[int]
     same_line_as_next_datapoint: bool
+    prior_line_only_releases_hold_on_this_arrow: bool
     time_since_last_same_arrow_use: float
     time_since_prev_downpress: float
     n_arrows_in_same_line: int
@@ -40,6 +41,7 @@ class ArrowDataPoint(AbstractArrowDataPoint):
             int(self.is_hold),
             int(len(self.active_hold_idxs) > 0),
             int(self.same_line_as_next_datapoint),
+            int(self.prior_line_only_releases_hold_on_this_arrow),
             self.time_since_last_same_arrow_use,
             self.time_since_prev_downpress, 
             self.n_arrows_in_same_line,
@@ -59,6 +61,7 @@ class ArrowDataPoint(AbstractArrowDataPoint):
             'is_hold',
             'has_active_hold',
             'in_same_line_as_next_datapoint',
+            'prior_line_only_releases_hold_on_this_arrow',
             'time_since_last_same_arrow_use',
             'time_since_prev_downpress',
             'num_arrows_in_same_line',

@@ -28,8 +28,12 @@ def main():
             continue
 
         cs = ChartStruct.from_file(csv)
-        cjs = ChartJsStruct.from_chartstruct(cs)
-        cjs.to_json(out_fn)
+        try:
+            cjs = ChartJsStruct.from_chartstruct(cs)
+            cjs.to_json(out_fn)
+        except Exception as e:
+            logger.error(str(e))
+            logger.error(csv)
 
     logger.success(f'Done.')
     return
@@ -41,7 +45,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chartstruct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/lgbm-091924',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/lgbm-092124',
     )
     args.parse_args(parser)
     main()
