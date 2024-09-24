@@ -52,6 +52,14 @@ def stepchart_ssc_to_chartstruct(
         all_beats += bd.get_event_times()
     beats = sorted(list(set(all_beats)))
 
+    in_warp = lambda beat: warps.beat_in_any_range(beat, inclusive_end = False)
+    in_fake = lambda beat: fakes.beat_in_any_range(beat)
+    in_fake_or_warp = lambda beat: in_warp(beat) or in_fake(beat)
+
+    if debug:
+        logger.debug(f'In debug mode in ssc to chartstruct - inspect beats, fakes, etc.')
+        import code; code.interact(local=dict(globals(), **locals()))
+
     # setup initial conditions
     beat = 0
     time = 0
@@ -70,11 +78,9 @@ def stepchart_ssc_to_chartstruct(
         """
         prev_beat = beats[beat_idx - 1] if beat_idx > 0 else -1
         next_beat = beats[beat_idx + 1] if beat_idx < len(beats) - 1 else max(beats) + 1
-        in_fake_or_warp = lambda beat: any([warps.beat_in_any_range(beat),
-                                            fakes.beat_in_any_range(beat)])
         line = beat_to_lines.get(beat, empty_line)
         comment = ''
-
+        
         # update bpm
         bpm = beat_to_bpm.get(beat, bpm)
 
@@ -143,7 +149,7 @@ def stepchart_ssc_to_chartstruct(
 
         # Update time if not in warp
         beat_increment = next_beat - beat
-        if not warps.beat_in_any_range(beat):
+        if not in_warp(beat):
             time += beat_increment * (60 / bpm)
             time += stops.get(beat, 0)
             time += delays.get(beat, 0)
@@ -234,13 +240,17 @@ class BeatToValueDict(UserDict):
     def from_string(string):
         return BeatToValueDict(parse_beat_value_map(string))
 
-    def beat_in_any_range(self, query_beat: float) -> bool:
+    def beat_in_any_range(self, query_beat: float, inclusive_end: bool = True) -> bool:
         """ Computes whether query_beat is in any range, interpreting
             key as starting beat, and value as length
         """
         for start_beat, length in self.data.items():
-            if start_beat <= query_beat < start_beat + length:
-                return True
+            if inclusive_end:
+                if start_beat <= query_beat <= start_beat + length:
+                    return True
+            else:
+                if start_beat <= query_beat < start_beat + length:
+                    return True
         return False
 
     def get_event_times(self) -> list[float]:

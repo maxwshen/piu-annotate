@@ -24,7 +24,8 @@ def main():
     for csv in tqdm(csvs):
         basename = make_basename_url_safe(os.path.basename(csv).replace('.csv', '.json'))
         out_fn = os.path.join(out_dir, basename)
-        if os.path.isfile(out_fn):
+
+        if os.path.isfile(out_fn) and not args.setdefault('rerun', False):
             continue
 
         cs = ChartStruct.from_file(csv)
