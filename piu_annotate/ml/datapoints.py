@@ -8,12 +8,7 @@ from piu_annotate.formats import notelines
 
 
 @dataclass
-class AbstractArrowDataPoint:
-    pass
-
-
-@dataclass
-class ArrowDataPoint(AbstractArrowDataPoint):
+class ArrowDataPoint:
     """ Datapoint representing a single arrow.
         A line can have multiple arrows.
         This should not use any limb information for any arrow.

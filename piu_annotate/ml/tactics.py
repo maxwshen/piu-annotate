@@ -8,12 +8,14 @@ from numpy.typing import NDArray
 import itertools
 import numpy as np
 from operator import itemgetter
+import math
 import functools
 from collections import defaultdict
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
 from piu_annotate.ml.models import ModelSuite
+from piu_annotate.ml.datapoints import ArrowDataPoint
 from piu_annotate.formats import notelines
 
 
@@ -49,12 +51,13 @@ def get_matches_prev(array: NDArray) -> NDArray:
 
 
 class Tactician:
-    def __init__(self, cs: ChartStruct, model_suite: ModelSuite):
+    def __init__(self, cs: ChartStruct, model_suite: ModelSuite, verbose: bool = False):
         """ Tactician uses a suite of ML models and a set of tactics to
             optimize predicted limb annotations for a given ChartStruct.
         """
         self.cs = cs
         self.models = model_suite
+        self.verbose = verbose
         self.pred_coords = self.cs.get_prediction_coordinates()
         self.fcs = featurizers.ChartStructFeaturizer(self.cs)
 
@@ -162,9 +165,21 @@ class Tactician:
     def fix_double_doublestep(self, pred_limbs: NDArray) -> NDArray:
         """ Find and fix sections starting and ending with double step
             where parity prediction strongly prefers alternating instead.
+
+            Options
+            -------
+            start_threshold_p: Min. predicted probability of flipping limb,
+                used to find candidate starts for double double steps
+            len_limit: Max length of double doublestep length range to flip
+            min_improvement_per_arrow: Minimum score improvement to accept
+                a proposed flip, divided by flip length
         """
+        start_threshold_p = args.setdefault('tactic.fix_double_doublestep.start_flip_prob', 0.9)
+        len_limit = args.setdefault('tactic.fix_double_doublestep.len_limit', 12)
+        min_improvement_per_arrow = args.setdefault('tactic.fix_double_doublestep.min_improvement_per_arrow', 2)
+
         # find low-scoring doublesteps
-        start_threshold = np.log(0.5)
+        start_threshold = np.log(1 - start_threshold_p)
         pred_matches_next = get_matches_next(pred_limbs)
         match_logp = self.predict_matchnext(logp = True)
         applied_logp = apply_index(match_logp, pred_matches_next)
@@ -172,7 +187,6 @@ class Tactician:
 
         def try_flip(pred_limbs: NDArray, cand_idx: int):
             start = cand_idx + 1
-            len_limit = 12
 
             end_cands = start + np.where(applied_logp[start:start + len_limit] < -0.2)[0]
             best_improvement = 0
@@ -191,7 +205,7 @@ class Tactician:
                     best_limbs = pl
                     best_end = end
 
-            if best_improvement > 0.7:
+            if best_improvement >= min_improvement_per_arrow:
                 return best_limbs, (start, best_end)
             return pred_limbs, None
 
@@ -205,9 +219,9 @@ class Tactician:
                 n_flips += 1
                 flipped_ranges.append(found_range)
 
-        # if n_flips > 0:
-        #     logger.debug(f'Flipped {n_flips} sections')
-        #     logger.debug(f'{flipped_ranges}')
+        if self.verbose and n_flips > 0:
+            logger.debug(f'Flipped {n_flips} sections')
+            logger.debug(f'{flipped_ranges}')
         return pred_limbs
 
     def beam_search(
@@ -280,8 +294,8 @@ class Tactician:
 
                     for limb, pc_idx in zip(best_combo, pc_idxs):
                         pred_limbs[pc_idx] = limb
-        # if n_lines_fixed > 0:
-            # logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
+        if self.verbose and n_lines_fixed > 0:
+            logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
         return pred_limbs
 
     def detect_impossible_lines_with_holds(self, pred_limbs: NDArray):
@@ -358,8 +372,71 @@ class Tactician:
 
                 for limb, pc_idx in zip(best_combo, all_pc_idxs):
                     pred_limbs[pc_idx] = limb
-        if n_lines_fixed > 0:
+        if self.verbose and n_lines_fixed > 0:
             logger.debug(f'Fixed {n_lines_fixed} impossible lines with holds')
+        return pred_limbs
+
+    def remove_doublesteps_in_long_nojack_runs(self, pred_limbs: NDArray) -> NDArray:
+        """ Remove doublesteps in long runs with no jacks, with constant `time_since`,
+            and each line has only one downpress.
+
+            Options
+            min_run_length: Minimum run length to consider
+            min_time_since: Minimum time_since to consider -- do not consider
+                runs with very low time_since as they may be staggered brackets
+            max_frac_doublestep: Skip removing doublesteps for sections with many
+                predicted doublesteps - these may be staggered brackets
+        """
+        min_run_length = args.setdefault('tactic.remove_doublesteps.min_run_length', 12)
+        min_time_since = args.setdefault('tactic.remove_doublesteps.min_time_since', 0.06)
+        max_frac_doublestep = args.setdefault('tactic.remove_doublesteps.max_frac_doublestep', 0.40)
+        # find long runs with nojacks, using arrowdatapoints
+        adps = self.fcs.arrowdatapoints
+
+        def is_in_run(start_adp: ArrowDataPoint, query_adp: ArrowDataPoint) -> bool:
+            """ Whether `query_adp` is in a run with `start_adp` """
+            return all([
+                math.isclose(query_adp.time_since_prev_downpress,
+                             start_adp.time_since_prev_downpress), 
+                query_adp.time_since_prev_downpress >= min_time_since,
+                query_adp.n_arrows_in_same_line == 1,
+                not query_adp.line_repeats_previous,
+                not query_adp.is_hold,
+            ])
+
+        runs = []
+        curr_run_start_idx = None
+        for pc_idx, adp in enumerate(adps):
+            if curr_run_start_idx is None:
+                curr_run_start_idx = pc_idx
+            else:
+                if is_in_run(adps[curr_run_start_idx], adp):
+                    pass
+                else:
+                    run_length = pc_idx - curr_run_start_idx
+                    if run_length >= min_run_length:
+                        runs.append((curr_run_start_idx - 1, pc_idx))
+                    curr_run_start_idx = pc_idx
+        
+        n_edits = 0
+        edited_runs = []
+        for run in runs:
+            limbs = pred_limbs[run[0]:run[1]]
+            n_double_steps = sum([len(list(g))-1 for k, g in itertools.groupby(limbs)])
+            if n_double_steps / len(limbs) >= max_frac_doublestep:
+                continue            
+            if n_double_steps == 0:
+                continue
+            
+            # edit: enforce alternating limb, using first predicted limb
+            base = [0, 1] if limbs[0] == 0 else [1, 0]
+            new_limbs = np.tile(base, len(limbs) // 2)[:len(limbs)]
+            pred_limbs[run[0]:run[1]] = new_limbs
+            n_edits += 1
+            edited_runs.append(run)
+
+        if self.verbose and n_edits > 0:
+            logger.debug(f'Corrected {n_edits} no-jack run sections: {edited_runs=}')
         return pred_limbs
 
     """

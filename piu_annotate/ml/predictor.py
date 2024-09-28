@@ -12,7 +12,7 @@ def predict(
     verbose: bool = False,
 ) -> ChartStruct:
     """ Use tactician to predict limb annotations for `cs` """
-    tactics = Tactician(cs, model_suite)
+    tactics = Tactician(cs, model_suite, verbose = verbose)
     fcs = featurizers.ChartStructFeaturizer(cs)
 
     score_to_limbs = dict()
@@ -39,6 +39,12 @@ def predict(
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
         logger.info(f'Score, beam search: {tactics.score(pred_limbs):.3f}')
+        fcs.evaluate(pred_limbs, verbose = True)
+
+    pred_limbs = tactics.remove_doublesteps_in_long_nojack_runs(pred_limbs)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
+    if verbose:
+        logger.info(f'Score, remove doublesteps in long nojack runs: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)
 
     pred_limbs = tactics.fix_double_doublestep(pred_limbs)

@@ -88,8 +88,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--chart_struct_csv', 
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/091924/Indestructible_-_Matduke_D22_ARCADE.csv'
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092424/Feel_My_Happiness_-_3R2_D21_ARCADE.csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Rising_Star_-_M2U_S17_arcade.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092424/Feel_My_Happiness_-_3R2_D21_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092124/Nyarlathotep_-_SHORT_CUT_-_-_Nato_D24_SHORTCUT.csv',
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Rising_Star_-_M2U_S17_arcade.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Headless_Chicken_-_r300k_S21_arcade.csv'
     )
