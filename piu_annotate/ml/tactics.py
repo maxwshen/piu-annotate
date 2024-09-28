@@ -57,6 +57,10 @@ class Tactician:
         self.models = model_suite
         self.pred_coords = self.cs.get_prediction_coordinates()
         self.fcs = featurizers.ChartStructFeaturizer(self.cs)
+
+        self.row_idx_to_pcs: dict[int, int] = defaultdict(list)
+        for pc_idx, pc in enumerate(self.pred_coords):
+            self.row_idx_to_pcs[pc.row_idx].append(pc_idx)
     
     def score(self, pred_limbs: NDArray) -> float:
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
@@ -241,15 +245,14 @@ class Tactician:
 
     def detect_impossible_multihit(self, pred_limbs: NDArray):
         """ Find parts of `pred_limbs` implying physically impossible
-            limb combo to hit any single line with multiple downpresses
+            limb combo to hit any single line with multiple downpresses;
+            primarily fixes brackets.
+            Does not consider holds.
         """
-        pred_limbs = pred_limbs.copy()
-        row_idx_to_pcs = defaultdict(list)
-        for pc_idx, pc in enumerate(self.pred_coords):
-            row_idx_to_pcs[pc.row_idx].append(pc_idx)
-        
+        pred_limbs = pred_limbs.copy()        
         n_lines_fixed = 0
-        for row_idx, pc_idxs in row_idx_to_pcs.items():
+
+        for row_idx, pc_idxs in self.row_idx_to_pcs.items():
             if len(pc_idxs) > 1:
                 pcs = [self.pred_coords[i] for i in pc_idxs]
                 limbs = pred_limbs[pc_idxs]
@@ -279,6 +282,84 @@ class Tactician:
                         pred_limbs[pc_idx] = limb
         # if n_lines_fixed > 0:
             # logger.debug(f'Fixed {n_lines_fixed} impossible multihit lines')
+        return pred_limbs
+
+    def detect_impossible_lines_with_holds(self, pred_limbs: NDArray):
+        """ Find parts of `pred_limbs` implying physically impossible
+            limb combo to hit any single line, when considering active holds too.
+            Attempts to adjust downpresses at the line to make it possible;
+            does not adjust prior holds.
+
+            There may still be impossible lines considering active holds after this,
+            if an incorrect limb is used for prior holds.
+        """
+        pred_limbs = pred_limbs.copy()
+        adps = self.fcs.arrowdatapoints
+
+        # get row idxs with active holds
+        pc_idx_active_holds = [i for i in range(len(adps)) if adps[i].active_hold_idxs]
+        rows_with_active_holds = sorted(set(self.pred_coords[i].row_idx for i in pc_idx_active_holds))
+
+        n_lines_fixed = 0
+        for row_idx in rows_with_active_holds:
+            row_pc_idxs = self.row_idx_to_pcs[row_idx]
+
+            # get pc idxs of active holds
+            active_hold_panel_pos = adps[row_pc_idxs[0]].active_hold_idxs
+            all_prev_pc_idxs = adps[row_pc_idxs[0]].prev_pc_idxs
+            hold_pc_idxs = [all_prev_pc_idxs[p] for p in active_hold_panel_pos]
+
+            hold_pcs = [self.pred_coords[i] for i in hold_pc_idxs]
+            hold_limbs = pred_limbs[hold_pc_idxs]
+            hold_left = [pc.arrow_pos for pc, limb in zip(hold_pcs, hold_limbs) if limb == 0]
+            hold_right = [pc.arrow_pos for pc, limb in zip(hold_pcs, hold_limbs) if limb == 1]
+
+            curr_pcs = [self.pred_coords[i] for i in row_pc_idxs]
+            curr_limbs = pred_limbs[row_pc_idxs]
+            curr_left = [pc.arrow_pos for pc, limb in zip(curr_pcs, curr_limbs) if limb == 0]
+            curr_right = [pc.arrow_pos for pc, limb in zip(curr_pcs, curr_limbs) if limb == 1]
+
+            all_left = hold_left + curr_left
+            all_right = hold_right + curr_right
+
+            left_ok = notelines.one_foot_multihit_possible(all_left)
+            right_ok = notelines.one_foot_multihit_possible(all_right)
+            if not (left_ok and right_ok):
+                all_arrows = sorted(all_left + all_right)
+                limb_combos = notelines.multihit_to_valid_limbs(all_arrows)
+
+                pos_to_pc_idxs = {pc.arrow_pos: self.pred_coords.index(pc)
+                                  for pc in hold_pcs + curr_pcs}
+                all_pc_idxs = [pos_to_pc_idxs[pos] for pos in all_arrows]
+
+                def limbs_match_holds(limb_combo: tuple[int]) -> bool:
+                    for pos, limb in zip(all_arrows, limb_combo):
+                        if pos in hold_left and limb != 0:
+                            return False
+                        if pos in hold_right and limb != 1:
+                            return False
+                    return True
+
+                # filter limb combos to those consistent with previous holds
+                valid_lcs = [lc for lc in limb_combos if limbs_match_holds(lc)]
+                if len(valid_lcs) == 0:
+                    logger.warning(f'Found impossible line with holds with no valid alternate')
+                    import code; code.interact(local=dict(globals(), **locals()))
+                    continue
+                
+                n_lines_fixed += 1
+                score_to_limbs = dict()
+                for limb_combo in valid_lcs:
+                    pl = pred_limbs.copy()
+                    for limb, pc_idx in zip(limb_combo, all_pc_idxs):
+                        pl[pc_idx] = limb
+                    score_to_limbs[self.score(pl)] = limb_combo
+                best_combo = score_to_limbs[max(score_to_limbs)]
+
+                for limb, pc_idx in zip(best_combo, all_pc_idxs):
+                    pred_limbs[pc_idx] = limb
+        if n_lines_fixed > 0:
+            logger.debug(f'Fixed {n_lines_fixed} impossible lines with holds')
         return pred_limbs
 
     """

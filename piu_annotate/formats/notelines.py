@@ -115,12 +115,12 @@ def one_foot_multihit_possible(arrow_positions: list[int]) -> bool:
 
 
 def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
-    """ Given `arrow_positions` for simultaneous downpresses,
-        returns a list of valid limb assignments represented as a tuple of ints.
+    """ Given `arrow_positions`, returns a list of valid limb assignments
+        represented as a tuple of ints.
         Each output tuple has the same length as `arrow_positions`, and has elements
         0 = left, 1 = right, for the i-th arrow position.
     """
-    arrow_positions = sorted(arrow_positions)
+    assert arrow_positions == sorted(arrow_positions), 'Must be sorted'
     if len(arrow_positions) == 2:
         ok = [(0, 1), (1, 0)]
         if arrow_positions in bracketable_arrow_positions:
@@ -152,10 +152,18 @@ def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
 @functools.cache
 def line_is_bracketable(line: str) -> bool:
     """ Returns whether `line` is bracketable, counting all downpresses (1-4).
+        If only two downpresses, returns whether line can be bracketed with one foot.
+        If three+ downpresses, returns whether line can be executed with one or more brackets
+        with two feet only.
     """
     line = line.replace('`', '')
     downpress_idxs = [i for i, x in enumerate(line) if x != '0']
-    return bool(len(multihit_to_valid_limbs(downpress_idxs)))
+    if len(downpress_idxs) == 2:
+        arrow_positions = sorted(downpress_idxs)
+        return bool(arrow_positions in bracketable_arrow_positions)
+    elif len(downpress_idxs) > 2:
+        return bool(len(multihit_to_valid_limbs(downpress_idxs)))
+    return False
 
 
 def add_active_holds(line: str, active_hold_idxs: set[str]) -> str:

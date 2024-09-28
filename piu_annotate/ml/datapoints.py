@@ -31,6 +31,7 @@ class ArrowDataPoint(AbstractArrowDataPoint):
     line_repeats_previous: bool
     line_repeats_next: bool
     singles_or_doubles: str
+    prev_pc_idxs: list[int | None]
 
     def to_array_categorical(self) -> NDArray:
         """ Featurize, using int for categorical features """

@@ -3,82 +3,14 @@ import os
 from hackerargs import args
 from loguru import logger
 from tqdm import tqdm
-from pathlib import Path
-import numpy as np
-import pickle
 from numpy.typing import NDArray
-from operator import itemgetter
-import itertools
 from collections import defaultdict
 import pandas as pd
 
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.model_selection import train_test_split
-
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
-from piu_annotate.ml.tactics import Tactician
 from piu_annotate.ml.models import ModelSuite
-
-
-def predict(
-    cs: ChartStruct, 
-    model_suite: ModelSuite,
-    verbose: bool = False,
-) -> ChartStruct:
-    """ Use tactician to predict limb annotations for `cs` """
-    tactics = Tactician(cs, model_suite)
-    fcs = featurizers.ChartStructFeaturizer(cs)
-
-    true_labels = fcs.get_labels_from_limb_col('Limb annotation')
-
-    score_to_limbs = dict()
-
-    # score true labels
-    if verbose:
-        logger.info(f'Score of true labels: {tactics.score(true_labels):.3f}')
-
-    pred_limbs = tactics.initial_predict()
-    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
-    if verbose:
-        logger.info(f'Score, initial pred: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs, verbose = True)
-
-    pred_limbs = tactics.flip_labels_by_score(pred_limbs)
-    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
-    if verbose:
-        logger.info(f'Score, flip: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs, verbose = True)
-
-    pred_limbs = tactics.flip_jack_sections(pred_limbs)
-    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
-    if verbose:
-        logger.info(f'Score, flip jacks: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs, verbose = True)
-
-    pred_limbs = tactics.beam_search(score_to_limbs[max(score_to_limbs)], width = 5, n_iter = 3)
-    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
-    if verbose:
-        logger.info(f'Score, beam search: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs, verbose = True)
-
-    pred_limbs = tactics.fix_double_doublestep(pred_limbs)
-    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
-    if verbose:
-        logger.info(f'Score, fix double doublestep: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs, verbose = True)
-
-    # best score
-    if verbose:
-        best_score = max(score_to_limbs.keys())
-        logger.success(f'Found {best_score=:.3f}')
-
-    pred_limbs = tactics.detect_impossible_multihit(score_to_limbs[max(score_to_limbs)])
-    if verbose:
-        logger.info(f'Score, fix impossible multihit: {tactics.score(pred_limbs):.3f}')
-        fcs.evaluate(pred_limbs, verbose = True)
-
-    return cs, fcs, pred_limbs
+from piu_annotate.ml.predictor import predict
 
 
 def accuracy(fcs: featurizers.ChartStructFeaturizer, pred_limbs: NDArray):
@@ -87,11 +19,13 @@ def accuracy(fcs: featurizers.ChartStructFeaturizer, pred_limbs: NDArray):
 
 
 def main():
-    singles_or_doubles = args['singles_or_doubles']
-    model_suite = ModelSuite(singles_or_doubles)
-
     if not args['run_folder']:
+        csv = args['chart_struct_csv']
+        logger.info(f'Using {csv=}')
         cs: ChartStruct = ChartStruct.from_file(args['chart_struct_csv'])
+        singles_or_doubles = cs.singles_or_doubles()
+        model_suite = ModelSuite(singles_or_doubles)
+
         cs, fcs, pred_limbs = predict(cs, model_suite, verbose = True)
 
         # annotate
@@ -112,6 +46,8 @@ def main():
     else:
         csv_folder = args['manual_chart_struct_folder']
         singles_or_doubles = args['singles_or_doubles']
+        logger.info(f'Running {singles_or_doubles} ...')
+        model_suite = ModelSuite(singles_or_doubles)
 
         # crawl all subdirs for csvs
         csvs = []
@@ -151,7 +87,8 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/091924/Indestructible_-_Matduke_D22_ARCADE.csv'
+        # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/091924/Indestructible_-_Matduke_D22_ARCADE.csv'
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092424/Feel_My_Happiness_-_3R2_D21_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Rising_Star_-_M2U_S17_arcade.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Conflict_-_Siromaru___Cranky_S11_arcade.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/Headless_Chicken_-_r300k_S21_arcade.csv'

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import json
 import os
+from collections import defaultdict
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
@@ -224,8 +225,7 @@ class ChartStruct:
     def get_previous_used_pred_coord_for_arrow(self) -> dict[int, int | None]:
         """ Compute dict mapping PredictionCoordinate index to the index of
             the PredictionCoordinate for the most recent previous time the
-            arrow was used.
-            If None, then None.
+            arrow was used, which can be None.
             Supports limb featurization that annotates the most recent
             (predicted) limb used for a given PredictionCoordinate. 
         """
@@ -236,6 +236,28 @@ class ChartStruct:
             pc_to_prev_idx[pc] = last_idx_used[pc.arrow_pos]
             last_idx_used[pc.arrow_pos] = idx
         return {idx: pc_to_prev_idx[pc] for idx, pc in enumerate(pcs)}
+
+    def get_previous_used_pred_coord(self) -> dict[int, list[int | None]]:
+        """ Compute dict mapping row index to a list of indices of
+            the PredictionCoordinate for the most recent previous time
+            each arrow was used, which can be None.
+        """
+        last_idx_used = [None] * 10
+        pcs = self.get_prediction_coordinates()
+        row_idx_to_prev = dict()
+
+        row_idx_to_pcs = defaultdict(list)
+        for pc in pcs:
+            row_idx_to_pcs[pc.row_idx].append(pc)
+
+        row_idxs = sorted(list(set(pc.row_idx for pc in pcs)))
+        for row_idx in row_idxs:
+            row_idx_to_prev[row_idx] = tuple(last_idx_used)
+
+            # update last idx used
+            for pc in row_idx_to_pcs[row_idx]:
+                last_idx_used[pc.arrow_pos] = pcs.index(pc)
+        return row_idx_to_prev
 
     def add_limb_annotations(
         self,

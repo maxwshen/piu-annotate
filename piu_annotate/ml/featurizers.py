@@ -31,6 +31,8 @@ class ChartStructFeaturizer:
         self.cs.annotate_line_repeats_next()
         self.pred_coords: list[PredictionCoordinate] = self.cs.get_prediction_coordinates()
 
+        self.row_idx_to_prevs = self.cs.get_previous_used_pred_coord()
+
         self.singles_or_doubles = cs.singles_or_doubles()
         self.arrowdatapoints = self.get_arrowdatapoints()
         self.pt_array = [pt.to_array_categorical() for pt in self.arrowdatapoints]
@@ -82,6 +84,7 @@ class ChartStructFeaturizer:
                 line_repeats_previous = row['__line repeats previous'],
                 line_repeats_next = row['__line repeats next'],
                 singles_or_doubles = self.singles_or_doubles,
+                prev_pc_idxs = self.row_idx_to_prevs[pred_coord.row_idx],
             )
             all_arrowdatapoints.append(point)
         return all_arrowdatapoints
