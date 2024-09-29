@@ -56,11 +56,6 @@ class ChartStructFeaturizer:
             line = row['Line with active holds'].replace('`', '')
             line_is_bracketable = notelines.line_is_bracketable(line)
 
-            same_line_as_next_datapoint = False
-            if idx + 1 < len(self.pred_coords):
-                if self.pred_coords[idx + 1].row_idx == pred_coord.row_idx:
-                    same_line_as_next_datapoint = True
-
             prior_line_only_releases_hold_on_this_arrow = False
             row_idx = pred_coord.row_idx
             if row_idx > 0:
@@ -75,11 +70,10 @@ class ChartStructFeaturizer:
                 is_hold = bool(line[arrow_pos] == '2'),
                 line_with_active_holds = line,
                 active_hold_idxs = [i for i, s in enumerate(line) if s in list('34')],
-                same_line_as_next_datapoint = same_line_as_next_datapoint,
                 prior_line_only_releases_hold_on_this_arrow = prior_line_only_releases_hold_on_this_arrow,
                 time_since_last_same_arrow_use = pc_to_time_last_arrow_use[pred_coord],
                 time_since_prev_downpress = row['__time since prev downpress'],
-                n_arrows_in_same_line = line.count('1') + line.count('2'),
+                num_downpress_in_line = line.count('1') + line.count('2'),
                 line_is_bracketable = line_is_bracketable,
                 line_repeats_previous = row['__line repeats previous'],
                 line_repeats_next = row['__line repeats next'],

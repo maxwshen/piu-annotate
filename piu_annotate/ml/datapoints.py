@@ -17,11 +17,10 @@ class ArrowDataPoint:
     is_hold: bool
     line_with_active_holds: str
     active_hold_idxs: list[int]
-    same_line_as_next_datapoint: bool
     prior_line_only_releases_hold_on_this_arrow: bool
     time_since_last_same_arrow_use: float
     time_since_prev_downpress: float
-    n_arrows_in_same_line: int
+    num_downpress_in_line: int
     line_is_bracketable: bool
     line_repeats_previous: bool
     line_repeats_next: bool
@@ -36,11 +35,10 @@ class ArrowDataPoint:
             self.arrow_pos,
             int(self.is_hold),
             int(len(self.active_hold_idxs) > 0),
-            int(self.same_line_as_next_datapoint),
             int(self.prior_line_only_releases_hold_on_this_arrow),
             self.time_since_last_same_arrow_use,
             self.time_since_prev_downpress, 
-            self.n_arrows_in_same_line,
+            self.num_downpress_in_line,
             int(self.line_is_bracketable),
             int(self.line_repeats_previous),
             int(self.line_repeats_next),
@@ -56,11 +54,10 @@ class ArrowDataPoint:
             'cat.arrow_pos',
             'is_hold',
             'has_active_hold',
-            'in_same_line_as_next_datapoint',
             'prior_line_only_releases_hold_on_this_arrow',
             'time_since_last_same_arrow_use',
             'time_since_prev_downpress',
-            'num_arrows_in_same_line',
+            'num_downpress_in_line',
             'line_is_bracketable',
             'line_repeats_previous',
             'line_repeats_next'

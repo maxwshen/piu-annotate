@@ -315,6 +315,7 @@ class Tactician:
         rows_with_active_holds = sorted(set(self.pred_coords[i].row_idx for i in pc_idx_active_holds))
 
         n_lines_fixed = 0
+        edited_pc_idxs = []
         for row_idx in rows_with_active_holds:
             row_pc_idxs = self.row_idx_to_pcs[row_idx]
 
@@ -358,7 +359,6 @@ class Tactician:
                 valid_lcs = [lc for lc in limb_combos if limbs_match_holds(lc)]
                 if len(valid_lcs) == 0:
                     logger.warning(f'Found impossible line with holds with no valid alternate')
-                    import code; code.interact(local=dict(globals(), **locals()))
                     continue
                 
                 n_lines_fixed += 1
@@ -372,8 +372,10 @@ class Tactician:
 
                 for limb, pc_idx in zip(best_combo, all_pc_idxs):
                     pred_limbs[pc_idx] = limb
+                edited_pc_idxs += row_pc_idxs
+
         if self.verbose and n_lines_fixed > 0:
-            logger.debug(f'Fixed {n_lines_fixed} impossible lines with holds')
+            logger.debug(f'Fixed {n_lines_fixed} impossible lines with holds: {edited_pc_idxs=}')
         return pred_limbs
 
     def remove_doublesteps_in_long_nojack_runs(self, pred_limbs: NDArray) -> NDArray:
