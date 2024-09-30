@@ -211,7 +211,6 @@ class StepchartSSC(UserDict):
         note_set = set(notes)
         return any(c in note_set for c in ['{', '}'])
 
-    @functools.cache
     def has_notelines_failing_grammar(self) -> bool:
         measures = self.data['NOTES'].split(',')
         ok_chars = set(list('0123'))

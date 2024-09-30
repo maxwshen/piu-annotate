@@ -16,7 +16,6 @@ import lightgbm as lgb
 from lightgbm import Booster
 from sklearn.model_selection import train_test_split
 from numpy.typing import NDArray
-from scipy import sparse
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
@@ -90,20 +89,15 @@ def create_dataset(
     labels = np.concatenate(all_labels)
     logger.info(f'Found dataset shape {points.shape}')
 
-    logger.info(f'Converting np array to scipy sparse ...')
-    sparse_points = sparse.csr_matrix(points)
-
-    result = (sparse_points, labels, feature_names)
-
-    with gzip.open(storage_file, 'wb') as f:
-        pickle.dump(result, f)
-    logger.info(f'Stored dataset into {storage_file}')
-
+    result = (points, labels, feature_names)
+    # with gzip.open(storage_file, 'wb') as f:
+    #     pickle.dump(result, f)
+    # logger.info(f'Stored dataset into {storage_file}')
     return result
 
 
 def train_categorical_model(
-    points: sparse.spmatrix, 
+    points: NDArray, 
     labels: NDArray, 
     feature_names: list[str]
 ):
@@ -170,15 +164,15 @@ def main():
     model = train_categorical_model(points, labels, feature_names)
     save_model(model, 'arrowlimbs_to_limb')
 
-    label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
-    points, labels, feature_names = create_dataset(csvs, label_func, 'matchnext')
-    model = train_categorical_model(points, labels, feature_names)
-    save_model(model, 'arrows_to_matchnext')
+    # label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
+    # points, labels, feature_names = create_dataset(csvs, label_func, 'matchnext')
+    # model = train_categorical_model(points, labels, feature_names)
+    # save_model(model, 'arrows_to_matchnext')
 
-    label_func = lambda fcs: fcs.get_label_matches_prev('Limb annotation')
-    points, labels, feature_names = create_dataset(csvs, label_func, 'matchprev')
-    model = train_categorical_model(points, labels, feature_names)
-    save_model(model, 'arrows_to_matchprev')
+    # label_func = lambda fcs: fcs.get_label_matches_prev('Limb annotation')
+    # points, labels, feature_names = create_dataset(csvs, label_func, 'matchprev')
+    # model = train_categorical_model(points, labels, feature_names)
+    # save_model(model, 'arrows_to_matchprev')
 
     logger.success('Done.')
     return

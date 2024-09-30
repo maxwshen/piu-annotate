@@ -7,6 +7,7 @@ import numpy as np
 import json
 import os
 from collections import defaultdict
+import functools
 
 from .piucenterdf import PiuCenterDataFrame
 from .sscfile import StepchartSSC
@@ -24,13 +25,14 @@ def right_index(items: list[any], query: any) -> int:
 
 
 @dataclass
-class PredictionCoordinate:
+class ArrowCoordinate:
     row_idx: int
     arrow_pos: int
     limb_idx: int
+    is_downpress: bool
 
     def __hash__(self):
-        return hash((self.row_idx, self.arrow_pos, self.limb_idx))
+        return hash((self.row_idx, self.arrow_pos, self.limb_idx, self.is_downpress))
 
 
 class ChartStruct:
@@ -181,77 +183,87 @@ class ChartStruct:
     """
         Prediction
     """
-    def get_prediction_coordinates(self) -> list[PredictionCoordinate]:
-        """ Find arrows to predict limb annotation: focus on 1/2.
-            Returns list of (row_idx, arrow_pos, limb_idx)
-        """
-        pred_coords = []
+    def get_arrow_coordinates(self) -> list[ArrowCoordinate]:
+        """ Get coordinates of arrows: 1, 2, 3"""
+        arrow_coords = []
         for idx, row in self.df.iterrows():
             line = row['Line'].replace('`', '')
             for arrow_pos, action in enumerate(line):
-                if action in list('12'):
+                if action in list('123'):
                     limb_idx = notelines.get_limb_idx_for_arrow_pos(
                         row['Line with active holds'],
                         arrow_pos
                     )
-                    pred_coord = PredictionCoordinate(idx, arrow_pos, limb_idx)
-                    pred_coords.append(pred_coord)
-        return pred_coords
+                    is_downpress = action in list('12')
+                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, is_downpress)
+                    arrow_coords.append(coord)
+        return arrow_coords
 
-    def get_time_since_last_same_arrow_use(self) -> dict[PredictionCoordinate, float]:
-        """ For each PredictionCoordinate, calculates the time since
-            that arrow was last used by any limb (1 or 3).
+    def get_prediction_coordinates(self) -> list[ArrowCoordinate]:
+        """ Get arrow coordinates with downpresses for limb prediction """
+        return [ac for ac in self.get_arrow_coordinates() if ac.is_downpress]
+
+    def get_time_since_last_same_arrow_use(self) -> dict[ArrowCoordinate, float]:
+        """ For each ArrowCoordinate with downpress, calculates the time since
+            that arrow was last used by any limb (1, 2, or 3).
         """
-        pc_to_time = dict()
+        ac_to_time = dict()
         last_time_used = [None] * 10
         for idx, row in self.df.iterrows():
             line = row['Line'].replace('`', '')
             time = row['Time']
             for arrow_pos, action in enumerate(line):
-                if action in list('12'):
+                if action in list('123'):
                     limb_idx = notelines.get_limb_idx_for_arrow_pos(
                         row['Line with active holds'],
                         arrow_pos
                     )
-                    pred_coord = PredictionCoordinate(idx, arrow_pos, limb_idx)
+                    has_downpress = action in list('12')
+                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, has_downpress)
                     if last_time_used[arrow_pos] is not None:
-                        pc_to_time[pred_coord] = time - last_time_used[arrow_pos]
+                        ac_to_time[coord] = time - last_time_used[arrow_pos]
                     else:
-                        pc_to_time[pred_coord] = -1
-                if action in list('13'):
+                        ac_to_time[coord] = -1
+
+                    # update last time used
                     last_time_used[arrow_pos] = time
-        return pc_to_time
+        return ac_to_time
 
     def get_previous_used_pred_coord_for_arrow(self) -> dict[int, int | None]:
-        """ Compute dict mapping PredictionCoordinate index to the index of
-            the PredictionCoordinate for the most recent previous time the
-            arrow was used, which can be None.
+        """ Compute dict mapping index of (ArrowCoordinate with downpress)
+            in pred_coords
+            to the index of
+            the (ArrowCoordinate with downpress) most recently used for
+            the same arrow, which can be None.
             Supports limb featurization that annotates the most recent
-            (predicted) limb used for a given PredictionCoordinate. 
+            (predicted) limb used for a given ArrowCoordinate. 
         """
+
         last_idx_used = [None] * 10
-        pcs = self.get_prediction_coordinates()
+        pred_coords = self.get_prediction_coordinates()
         pc_to_prev_idx = dict()
-        for idx, pc in enumerate(pcs):            
+        for idx, pc in enumerate(pred_coords):
             pc_to_prev_idx[pc] = last_idx_used[pc.arrow_pos]
             last_idx_used[pc.arrow_pos] = idx
-        return {idx: pc_to_prev_idx[pc] for idx, pc in enumerate(pcs)}
+        return {idx: pc_to_prev_idx[pc] for idx, pc in enumerate(pred_coords)}
 
     def get_previous_used_pred_coord(self) -> dict[int, list[int | None]]:
         """ Compute dict mapping row index to a list of indices of
-            the PredictionCoordinate for the most recent previous time
-            each arrow was used, which can be None.
+            the (ArrowCoordinate with downpress) most recently used
+            for each arrow, which can be None.
+            Used by tactician to check for impossible lines with holds.
         """
         last_idx_used = [None] * 10
         pcs = self.get_prediction_coordinates()
+        acs = self.get_arrow_coordinates()
         row_idx_to_prev = dict()
 
         row_idx_to_pcs = defaultdict(list)
         for pc in pcs:
             row_idx_to_pcs[pc.row_idx].append(pc)
 
-        row_idxs = sorted(list(set(pc.row_idx for pc in pcs)))
-        for row_idx in row_idxs:
+        all_row_idxs = sorted(list(set(ac.row_idx for ac in acs)))
+        for row_idx in all_row_idxs:
             row_idx_to_prev[row_idx] = tuple(last_idx_used)
 
             # update last idx used
@@ -261,24 +273,22 @@ class ChartStruct:
 
     def add_limb_annotations(
         self,
-        pred_coords: list[PredictionCoordinate],
+        arrow_coords: list[ArrowCoordinate],
         limb_annots: list[str],
         new_col: str
     ) -> None:
-        """ Populates `new_col` in df with `limb_annots` at `pred_coords`,
+        """ Populates `new_col` in df with `limb_annots` at `arrow_coords`,
             for example predicted limb annotations.
 
             Holds started with a limb will use that same limb throughout the hold
             duration.
         """
-        assert len(pred_coords) == len(limb_annots)
+        assert len(arrow_coords) == len(limb_annots)
         self.init_limb_annotations(new_col)
 
-        active_holds = {}   # arrowpos: limb
-
-        row_arrow_to_pc = {}
-        for pc in pred_coords:
-            row_arrow_to_pc[(pc.row_idx, pc.arrow_pos)] = pc
+        row_arrow_to_ac = {}
+        for ac in arrow_coords:
+            row_arrow_to_ac[(ac.row_idx, ac.arrow_pos)] = ac
 
         def update_limb_annot(row_idx: int, limb_idx: int, new_limb: str):
             prev_annot = self.df.iloc[row_idx][new_col]
@@ -286,7 +296,7 @@ class ChartStruct:
             self.df.loc[row_idx, new_col] = new_annot
             return
 
-
+        active_holds = {}   # arrowpos: limb
         for row_idx, row in self.df.iterrows():
             line = row['Line with active holds']
 
@@ -296,8 +306,8 @@ class ChartStruct:
 
                     if sym in list('12'):
                         # get new limb
-                        pc = row_arrow_to_pc[(row_idx, arrow_pos)]
-                        new_limb = limb_annots[pred_coords.index(pc)]
+                        ac = row_arrow_to_ac[(row_idx, arrow_pos)]
+                        new_limb = limb_annots[arrow_coords.index(ac)]
 
                     if sym == '1':
                         update_limb_annot(row_idx, limb_idx, new_limb)

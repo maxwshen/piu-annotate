@@ -9,7 +9,7 @@ from hackerargs import args
 import functools
 import os
 
-from piu_annotate.formats.chart import ChartStruct, PredictionCoordinate
+from piu_annotate.formats.chart import ChartStruct, ArrowCoordinate
 from piu_annotate.formats import notelines
 from piu_annotate.ml.datapoints import LimbLabel, ArrowDataPoint
 
@@ -24,16 +24,20 @@ class ChartStructFeaturizer:
         """
         self.cs = cs
         self.context_len = args.setdefault('ft.context_length', 20)
-        self.prev_limb_feature_context_len = 8
+        self.context_with_hold_release = args.setdefault('ft.context_with_hold_release', False)
+        self.prev_limb_feature_context_len = args.setdefault('ft.prev_limb_context_len', 8)
+
+        self.singles_or_doubles = cs.singles_or_doubles()
 
         self.cs.annotate_time_since_downpress()
         self.cs.annotate_line_repeats_previous()
         self.cs.annotate_line_repeats_next()
-        self.pred_coords: list[PredictionCoordinate] = self.cs.get_prediction_coordinates()
+        self.arrow_coords = self.cs.get_arrow_coordinates()
+        self.pred_coords = self.cs.get_prediction_coordinates()
 
         self.row_idx_to_prevs = self.cs.get_previous_used_pred_coord()
 
-        self.singles_or_doubles = cs.singles_or_doubles()
+        # Featurize all arrows: 1, 2, 3
         self.arrowdatapoints = self.get_arrowdatapoints()
         self.pt_array = [pt.to_array_categorical() for pt in self.arrowdatapoints]
         self.pt_feature_names = self.arrowdatapoints[0].get_feature_names_categorical()
@@ -49,36 +53,49 @@ class ChartStructFeaturizer:
         Build
     """    
     def get_arrowdatapoints(self) -> list[ArrowDataPoint]:
+        """ Featurize chart into ArrowDataPoints
+
+            Options
+            -------
+            context_with_hold_release: If True, then include all 1/2/3 arrows
+                Otherwise, only use prediction coordinates (1/2)
+        """
         all_arrowdatapoints = []
-        pc_to_time_last_arrow_use = self.cs.get_time_since_last_same_arrow_use()
-        for idx, pred_coord in enumerate(self.pred_coords):
-            row = self.cs.df.iloc[pred_coord.row_idx]
+        ac_to_time_last_arrow_use = self.cs.get_time_since_last_same_arrow_use()
+
+        if self.context_with_hold_release:
+            coords = self.arrow_coords
+        else:
+            coords = self.pred_coords
+
+        for idx, arrow_coord in enumerate(coords):
+            row = self.cs.df.iloc[arrow_coord.row_idx]
             line = row['Line with active holds'].replace('`', '')
             line_is_bracketable = notelines.line_is_bracketable(line)
 
             prior_line_only_releases_hold_on_this_arrow = False
-            row_idx = pred_coord.row_idx
+            row_idx = arrow_coord.row_idx
             if row_idx > 0:
-                prev_line = self.cs.df.iloc[row_idx - 1]['Line']
-                if prev_line[pred_coord.arrow_pos] == '3':
+                prev_line = self.cs.df.iloc[row_idx - 1]['Line'].replace('`', '')
+                if prev_line[arrow_coord.arrow_pos] == '3':
                     if prev_line.count('0') in [4, 9]:
                         prior_line_only_releases_hold_on_this_arrow = True
 
-            arrow_pos = pred_coord.arrow_pos
+            arrow_pos = arrow_coord.arrow_pos
             point = ArrowDataPoint(
                 arrow_pos = arrow_pos,
-                is_hold = bool(line[arrow_pos] == '2'),
+                arrow_symbol = line[arrow_pos],
                 line_with_active_holds = line,
                 active_hold_idxs = [i for i, s in enumerate(line) if s in list('34')],
                 prior_line_only_releases_hold_on_this_arrow = prior_line_only_releases_hold_on_this_arrow,
-                time_since_last_same_arrow_use = pc_to_time_last_arrow_use[pred_coord],
+                time_since_last_same_arrow_use = ac_to_time_last_arrow_use[arrow_coord],
                 time_since_prev_downpress = row['__time since prev downpress'],
                 num_downpress_in_line = line.count('1') + line.count('2'),
                 line_is_bracketable = line_is_bracketable,
                 line_repeats_previous = row['__line repeats previous'],
                 line_repeats_next = row['__line repeats next'],
                 singles_or_doubles = self.singles_or_doubles,
-                prev_pc_idxs = self.row_idx_to_prevs[pred_coord.row_idx],
+                prev_pc_idxs = self.row_idx_to_prevs[arrow_coord.row_idx],
             )
             all_arrowdatapoints.append(point)
         return all_arrowdatapoints
@@ -111,7 +128,6 @@ class ChartStructFeaturizer:
     """
         Featurize
     """
-    @functools.cache
     def get_padded_array(self) -> NDArray:
         pt_array = self.pt_array
         context_len = self.context_len
@@ -119,7 +135,7 @@ class ChartStructFeaturizer:
         empty_pt.fill(np.nan)
         return np.array([empty_pt]*context_len + pt_array + [empty_pt]*context_len)
 
-    @functools.cache
+    @functools.lru_cache
     def featurize_arrows_with_context(self) -> NDArray:
         """ For N arrows with D feature dims, constructs prediction input
             for each arrow including context arrows on both sides.
@@ -141,7 +157,15 @@ class ChartStructFeaturizer:
         cmf = np.repeat(self.chart_metadata_features.reshape(-1, 1), N, axis = 0)
         # shaped into (N, d)
         all_x = np.concatenate((view, cmf), axis = 1)
-        return all_x
+
+        if len(all_x) > len(self.pred_coords):
+            # Using context_with_hold_release; subset to PredictionCoordinates
+            pred_coord_idxs = [idx for idx, ac in enumerate(self.arrow_coords)
+                            if ac in self.pred_coords]
+            all_pred_coord_fts = all_x[pred_coord_idxs]
+        else:
+            all_pred_coord_fts = all_x
+        return all_pred_coord_fts
 
     def get_arrow_context_feature_names(self) -> list[str]:
         """ Must be aligned with featurize_arrows_with_context """
@@ -200,7 +224,7 @@ class ChartStructFeaturizer:
         return features
 
     def get_arrowlimb_context_feature_names(self) -> list[str]:
-        """ Must be aligned with featurize_arrows_with_context """
+        """ Must be aligned with featurize_arrowlimbs_with_context """
         fnames = self.get_arrow_context_feature_names()
 
         # add limb feature for nearby arrows
@@ -210,7 +234,8 @@ class ChartStructFeaturizer:
         fnames += [f'prev_limb_nearby_arrow_{idx}'
                    for idx in range(2 * self.prev_limb_feature_context_len + 1)]
 
-        __fake_limb_probs = np.ones((len(self.pt_array)))
+        n_pred_coords = self.featurize_arrows_with_context().shape[0]
+        __fake_limb_probs = np.ones(n_pred_coords)
         assert len(fnames) == self.featurize_arrowlimbs_with_context(__fake_limb_probs).shape[-1]
         return fnames
 

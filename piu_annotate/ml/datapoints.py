@@ -14,7 +14,7 @@ class ArrowDataPoint:
         This should not use any limb information for any arrow.
     """
     arrow_pos: int
-    is_hold: bool
+    arrow_symbol: int
     line_with_active_holds: str
     active_hold_idxs: list[int]
     prior_line_only_releases_hold_on_this_arrow: bool
@@ -33,7 +33,7 @@ class ArrowDataPoint:
         line_ft = [int(c) for c in self.line_with_active_holds]
         fts = [
             self.arrow_pos,
-            int(self.is_hold),
+            int(self.arrow_symbol),
             int(len(self.active_hold_idxs) > 0),
             int(self.prior_line_only_releases_hold_on_this_arrow),
             self.time_since_last_same_arrow_use,
@@ -52,7 +52,7 @@ class ArrowDataPoint:
         line_ft_names = [f'cat.line_pos{idx}' for idx in range(length)]
         ft_names = [
             'cat.arrow_pos',
-            'is_hold',
+            'cat.arrow_symbol',
             'has_active_hold',
             'prior_line_only_releases_hold_on_this_arrow',
             'time_since_last_same_arrow_use',

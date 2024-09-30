@@ -29,10 +29,10 @@ def main():
         cs, fcs, pred_limbs = predict(cs, model_suite, verbose = True)
 
         # annotate
-        pred_coords = cs.get_prediction_coordinates()
+        arrow_coords = cs.get_arrow_coordinates()
         int_to_limb = {0: 'l', 1: 'r'}
         pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
-        cs.add_limb_annotations(pred_coords, pred_limb_strs, '__pred limb final')
+        cs.add_limb_annotations(arrow_coords, pred_limb_strs, '__pred limb final')
 
         cs.df['Error'] = (
             cs.df['__pred limb final'] != cs.df['Limb annotation']

@@ -69,7 +69,7 @@ class Tactician:
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
         log_prob_labels_withlimb = sum(apply_index(log_probs_withlimb, pred_limbs))
 
-        log_prob_matches = self.predict_matchnext(logp = True)
+        log_prob_matches = self.predict_matchnext_logp(logp = True)
         matches_next = get_matches_next(pred_limbs)
         log_prob_labels_matches = sum(apply_index(log_prob_matches, matches_next))
 
@@ -444,7 +444,7 @@ class Tactician:
     """
         Model predictions
     """
-    @functools.cache
+    @functools.lru_cache
     def predict_arrow(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
@@ -459,7 +459,7 @@ class Tactician:
         else:
             return self.models.model_arrowlimbs_to_limb.predict(points)
 
-    @functools.cache
+    @functools.lru_cache
     def predict_matchnext(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:
@@ -467,7 +467,7 @@ class Tactician:
         else:
             return self.models.model_arrows_to_matchnext.predict(points)
 
-    @functools.cache
+    @functools.lru_cache
     def predict_matchprev(self, logp: bool = False) -> NDArray:
         points = self.fcs.featurize_arrows_with_context()
         if logp:

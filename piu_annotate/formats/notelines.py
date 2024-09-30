@@ -149,7 +149,7 @@ def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
     return []
 
 
-@functools.cache
+@functools.lru_cache
 def line_is_bracketable(line: str) -> bool:
     """ Returns whether `line` is bracketable, counting all downpresses (1-4).
         If only two downpresses, returns whether line can be bracketed with one foot.
