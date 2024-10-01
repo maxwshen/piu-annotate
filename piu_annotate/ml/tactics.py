@@ -69,7 +69,7 @@ class Tactician:
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
         log_prob_labels_withlimb = sum(apply_index(log_probs_withlimb, pred_limbs))
 
-        log_prob_matches = self.predict_matchnext_logp(logp = True)
+        log_prob_matches = self.predict_matchnext(logp = True)
         matches_next = get_matches_next(pred_limbs)
         log_prob_labels_matches = sum(apply_index(log_prob_matches, matches_next))
 
@@ -386,11 +386,14 @@ class Tactician:
             min_run_length: Minimum run length to consider
             min_time_since: Minimum time_since to consider -- do not consider
                 runs with very low time_since as they may be staggered brackets
+            max_time_since: Max time_since to consider - do not consider notes
+                very far apart
             max_frac_doublestep: Skip removing doublesteps for sections with many
                 predicted doublesteps - these may be staggered brackets
         """
-        min_run_length = args.setdefault('tactic.remove_doublesteps.min_run_length', 12)
-        min_time_since = args.setdefault('tactic.remove_doublesteps.min_time_since', 0.06)
+        min_run_length = args.setdefault('tactic.remove_doublesteps.min_run_length', 4)
+        min_time_since = args.setdefault('tactic.remove_doublesteps.min_time_since', 1/13)
+        max_time_since = args.setdefault('tactic.remove_doublesteps.max_time_since', 1/3.3)
         max_frac_doublestep = args.setdefault('tactic.remove_doublesteps.max_frac_doublestep', 0.40)
         # find long runs with nojacks, using arrowdatapoints
         adps = self.fcs.arrowdatapoints
@@ -401,9 +404,10 @@ class Tactician:
                 math.isclose(query_adp.time_since_prev_downpress,
                              start_adp.time_since_prev_downpress), 
                 query_adp.time_since_prev_downpress >= min_time_since,
-                query_adp.n_arrows_in_same_line == 1,
+                query_adp.time_since_prev_downpress < max_time_since,
+                query_adp.num_downpress_in_line == 1,
                 not query_adp.line_repeats_previous,
-                not query_adp.is_hold,
+                query_adp.arrow_symbol == '1',
             ])
 
         runs = []
@@ -419,7 +423,7 @@ class Tactician:
                     if run_length >= min_run_length:
                         runs.append((curr_run_start_idx - 1, pc_idx))
                     curr_run_start_idx = pc_idx
-        
+
         n_edits = 0
         edited_runs = []
         for run in runs:
@@ -430,14 +434,25 @@ class Tactician:
             if n_double_steps == 0:
                 continue
             
-            # edit: enforce alternating limb, using first predicted limb
-            base = [0, 1] if limbs[0] == 0 else [1, 0]
-            new_limbs = np.tile(base, len(limbs) // 2)[:len(limbs)]
-            pred_limbs[run[0]:run[1]] = new_limbs
+            # edit: enforce alternating limb, score each permutation
+            left_pl = pred_limbs.copy()
+            left_pl[run[0]:run[1]] = np.tile([0, 1], len(limbs) // 2 + 1)[:len(limbs)]
+            start_left_score = self.score(left_pl)
+
+            right_pl = pred_limbs.copy()
+            right_pl[run[0]:run[1]] = np.tile([1, 0], len(limbs) // 2 + 1)[:len(limbs)]
+            start_right_score = self.score(right_pl)
+
+            if start_left_score > start_right_score:
+                pred_limbs = left_pl
+            else:
+                pred_limbs = right_pl
+
             n_edits += 1
             edited_runs.append(run)
 
-        if self.verbose and n_edits > 0:
+        if self.verbose:
+            logger.debug(f'Found {runs=}')
             logger.debug(f'Corrected {n_edits} no-jack run sections: {edited_runs=}')
         return pred_limbs
 

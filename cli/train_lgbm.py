@@ -164,15 +164,15 @@ def main():
     model = train_categorical_model(points, labels, feature_names)
     save_model(model, 'arrowlimbs_to_limb')
 
-    # label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
-    # points, labels, feature_names = create_dataset(csvs, label_func, 'matchnext')
-    # model = train_categorical_model(points, labels, feature_names)
-    # save_model(model, 'arrows_to_matchnext')
+    label_func = lambda fcs: fcs.get_label_matches_next('Limb annotation')
+    points, labels, feature_names = create_dataset(csvs, label_func, 'matchnext')
+    model = train_categorical_model(points, labels, feature_names)
+    save_model(model, 'arrows_to_matchnext')
 
-    # label_func = lambda fcs: fcs.get_label_matches_prev('Limb annotation')
-    # points, labels, feature_names = create_dataset(csvs, label_func, 'matchprev')
-    # model = train_categorical_model(points, labels, feature_names)
-    # save_model(model, 'arrows_to_matchprev')
+    label_func = lambda fcs: fcs.get_label_matches_prev('Limb annotation')
+    points, labels, feature_names = create_dataset(csvs, label_func, 'matchprev')
+    model = train_categorical_model(points, labels, feature_names)
+    save_model(model, 'arrows_to_matchprev')
 
     logger.success('Done.')
     return
@@ -186,6 +186,10 @@ if __name__ == '__main__':
         '--manual_chart_struct_folder', 
         default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/',
         # default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/piucenter-manual-090624/',
+    )
+    parser.add_argument(
+        '--singles_or_doubles', 
+        default = 'singles',
     )
     args.parse_args(parser)
     main()

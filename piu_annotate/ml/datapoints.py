@@ -14,7 +14,7 @@ class ArrowDataPoint:
         This should not use any limb information for any arrow.
     """
     arrow_pos: int
-    arrow_symbol: int
+    arrow_symbol: str
     line_with_active_holds: str
     active_hold_idxs: list[int]
     prior_line_only_releases_hold_on_this_arrow: bool

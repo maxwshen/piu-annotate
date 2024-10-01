@@ -29,10 +29,10 @@ def main():
         cs, fcs, pred_limbs = predict(cs, model_suite, verbose = True)
 
         # annotate
-        arrow_coords = cs.get_arrow_coordinates()
+        pred_coords = cs.get_prediction_coordinates()
         int_to_limb = {0: 'l', 1: 'r'}
         pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
-        cs.add_limb_annotations(arrow_coords, pred_limb_strs, '__pred limb final')
+        cs.add_limb_annotations(pred_coords, pred_limb_strs, '__pred limb final')
 
         cs.df['Error'] = (
             cs.df['__pred limb final'] != cs.df['Limb annotation']
@@ -42,6 +42,7 @@ def main():
         out_fn = f'temp/{basename}'
         cs.to_csv(out_fn)
         logger.info(f'Saved to {out_fn}')
+        import code; code.interact(local=dict(globals(), **locals()))
 
     else:
         csv_folder = args['manual_chart_struct_folder']
@@ -108,6 +109,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/092124/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/092924/model-config.yaml'
     )
     main()

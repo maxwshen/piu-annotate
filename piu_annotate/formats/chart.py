@@ -9,9 +9,9 @@ import os
 from collections import defaultdict
 import functools
 
-from .piucenterdf import PiuCenterDataFrame
-from .sscfile import StepchartSSC
-from .ssc_to_chartstruct import stepchart_ssc_to_chartstruct
+from piu_annotate.formats.piucenterdf import PiuCenterDataFrame
+from piu_annotate.formats.sscfile import StepchartSSC
+from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 from piu_annotate.formats.jsplot import ArrowArt, HoldArt, ChartJsStruct
 from piu_annotate.formats import notelines
 
@@ -342,7 +342,7 @@ class ChartStruct:
     """
         Annotate
     """
-    def annotate_time_since_downpress(self):
+    def annotate_time_since_downpress(self) -> None:
         """ Adds column `__time since prev downpress` to df
         """
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
@@ -363,7 +363,7 @@ class ChartStruct:
         self.df['__time since prev downpress'] = time_since_dp
         return
 
-    def annotate_line_repeats_previous(self):
+    def annotate_line_repeats_previous(self) -> None:
         """ Adds column `__line repeats previous` to df,
             which is True if current line is the same as previous or next line
             with downpress.
@@ -388,7 +388,7 @@ class ChartStruct:
         self.df['__line repeats previous'] = line_repeats
         return
 
-    def annotate_line_repeats_next(self):
+    def annotate_line_repeats_next(self) -> None:
         """ Adds column `__line repeats next` to df,
             which is True if current line is the same as previous or next line
             with downpress.
@@ -411,6 +411,12 @@ class ChartStruct:
             line_repeats.append(repeats)
 
         self.df['__line repeats next'] = line_repeats
+        return
+
+    def annotate_num_downpresses(self) -> None:
+        """ Adds column `__num downpresses` to df """
+        self.df['__num downpresses'] = self.df['Line'].str.count('1') + \
+            self.df['Line'].str.count('2')
         return
 
     """
