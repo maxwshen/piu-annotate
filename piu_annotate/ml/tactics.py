@@ -17,6 +17,7 @@ from piu_annotate.ml import featurizers
 from piu_annotate.ml.models import ModelSuite
 from piu_annotate.ml.datapoints import ArrowDataPoint
 from piu_annotate.formats import notelines
+from piu_annotate.ml import run_reasoning
 
 
 def apply_index(array, idxs):
@@ -65,7 +66,7 @@ class Tactician:
         for pc_idx, pc in enumerate(self.pred_coords):
             self.row_idx_to_pcs[pc.row_idx].append(pc_idx)
     
-    def score(self, pred_limbs: NDArray) -> float:
+    def score(self, pred_limbs: NDArray, debug: bool = False) -> float:
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
         log_prob_labels_withlimb = sum(apply_index(log_probs_withlimb, pred_limbs))
 
@@ -77,11 +78,19 @@ class Tactician:
         matches_prev = get_matches_prev(pred_limbs)
         log_prob_labels_matches_prev = sum(apply_index(log_prob_matches_prev, matches_prev))
 
-        return sum([
+        score_components = [
             log_prob_labels_withlimb,
             np.mean([log_prob_labels_matches, log_prob_labels_matches_prev])
-        ])
+        ]
+        if debug:
+            logger.debug(score_components)
+        return sum(score_components)
     
+    def score_limbs_given_limbs(self, pred_limbs: NDArray) -> float:
+        log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
+        log_prob_labels_withlimb = sum(apply_index(log_probs_withlimb, pred_limbs))
+        return log_prob_labels_withlimb
+
     def label_flip_improvement(self, pred_limbs: NDArray) -> NDArray:
         """ Returns score improvement vector """
         log_probs_withlimb = self.predict_arrowlimbs(pred_limbs, logp = True)
@@ -219,9 +228,8 @@ class Tactician:
                 n_flips += 1
                 flipped_ranges.append(found_range)
 
-        if self.verbose and n_flips > 0:
-            logger.debug(f'Flipped {n_flips} sections')
-            logger.debug(f'{flipped_ranges}')
+        if self.verbose:
+            logger.debug(f'Flipped {n_flips} sections: {flipped_ranges}')
         return pred_limbs
 
     def beam_search(
@@ -308,7 +316,7 @@ class Tactician:
             if an incorrect limb is used for prior holds.
         """
         pred_limbs = pred_limbs.copy()
-        adps = self.fcs.arrowdatapoints
+        adps = self.fcs.arrowdatapoints_without_3
 
         # get row idxs with active holds
         pc_idx_active_holds = [i for i in range(len(adps)) if adps[i].active_hold_idxs]
@@ -382,7 +390,7 @@ class Tactician:
         """ Remove doublesteps in long runs with no jacks, with constant `time_since`,
             and each line has only one downpress.
 
-            Options
+            Options in args
             min_run_length: Minimum run length to consider
             min_time_since: Minimum time_since to consider -- do not consider
                 runs with very low time_since as they may be staggered brackets
@@ -391,41 +399,15 @@ class Tactician:
             max_frac_doublestep: Skip removing doublesteps for sections with many
                 predicted doublesteps - these may be staggered brackets
         """
-        min_run_length = args.setdefault('tactic.remove_doublesteps.min_run_length', 4)
-        min_time_since = args.setdefault('tactic.remove_doublesteps.min_time_since', 1/13)
-        max_time_since = args.setdefault('tactic.remove_doublesteps.max_time_since', 1/3.3)
         max_frac_doublestep = args.setdefault('tactic.remove_doublesteps.max_frac_doublestep', 0.40)
         # find long runs with nojacks, using arrowdatapoints
-        adps = self.fcs.arrowdatapoints
+        adps = self.fcs.arrowdatapoints_without_3
+        runs = run_reasoning.find_runs_without_jacks(adps, verbose = self.verbose)
 
-        def is_in_run(start_adp: ArrowDataPoint, query_adp: ArrowDataPoint) -> bool:
-            """ Whether `query_adp` is in a run with `start_adp` """
-            return all([
-                math.isclose(query_adp.time_since_prev_downpress,
-                             start_adp.time_since_prev_downpress), 
-                query_adp.time_since_prev_downpress >= min_time_since,
-                query_adp.time_since_prev_downpress < max_time_since,
-                query_adp.num_downpress_in_line == 1,
-                not query_adp.line_repeats_previous,
-                query_adp.arrow_symbol == '1',
-            ])
-
-        runs = []
-        curr_run_start_idx = None
-        for pc_idx, adp in enumerate(adps):
-            if curr_run_start_idx is None:
-                curr_run_start_idx = pc_idx
-            else:
-                if is_in_run(adps[curr_run_start_idx], adp):
-                    pass
-                else:
-                    run_length = pc_idx - curr_run_start_idx
-                    if run_length >= min_run_length:
-                        runs.append((curr_run_start_idx - 1, pc_idx))
-                    curr_run_start_idx = pc_idx
-
-        n_edits = 0
-        edited_runs = []
+        n_edits_reasoner = 0
+        edited_runs_reasoner = []
+        n_edits_mlscore = 0
+        edited_runs_mlscore = []
         for run in runs:
             limbs = pred_limbs[run[0]:run[1]]
             n_double_steps = sum([len(list(g))-1 for k, g in itertools.groupby(limbs)])
@@ -434,26 +416,56 @@ class Tactician:
             if n_double_steps == 0:
                 continue
             
-            # edit: enforce alternating limb, score each permutation
+            start_left_limbs = np.tile([0, 1], len(limbs) // 2 + 1)[:len(limbs)]
+            start_right_limbs = np.tile([1, 0], len(limbs) // 2 + 1)[:len(limbs)]
+
+            # 1. try using run pattern reasoner to decide limbs
+            run_adps = adps[run[0]:run[1]]
+            reason_left_score = run_reasoning.score_run(run_adps, start_left_limbs)
+            reason_right_score = run_reasoning.score_run(run_adps, start_right_limbs)
+            if reason_left_score > reason_right_score:
+                pred_limbs[run[0]:run[1]] = start_left_limbs
+                n_edits_reasoner += 1
+                edited_runs_reasoner.append(run)
+                continue
+            elif reason_left_score < reason_right_score:
+                pred_limbs[run[0]:run[1]] = start_right_limbs
+                n_edits_reasoner += 1
+                edited_runs_reasoner.append(run)
+                continue
+            # if tie, then proceed to #2
+
+            # 2. score starting w left vs right using ML models
             left_pl = pred_limbs.copy()
-            left_pl[run[0]:run[1]] = np.tile([0, 1], len(limbs) // 2 + 1)[:len(limbs)]
+            left_pl[run[0]:run[1]] = start_left_limbs
             start_left_score = self.score(left_pl)
 
             right_pl = pred_limbs.copy()
-            right_pl[run[0]:run[1]] = np.tile([1, 0], len(limbs) // 2 + 1)[:len(limbs)]
+            right_pl[run[0]:run[1]] = start_right_limbs
             start_right_score = self.score(right_pl)
 
-            if start_left_score > start_right_score:
-                pred_limbs = left_pl
-            else:
-                pred_limbs = right_pl
+            # hacky; using 0 = left and 1 = right
+            initial_limb = limbs[0]
+            limb_scores = [start_left_score, start_right_score]
+            initial_limb_score = limb_scores[initial_limb]
+            change_limb_score = limb_scores[1 - initial_limb]
+            pls = [left_pl, right_pl]
+            pl_using_initial_limb = pls[initial_limb]
+            pl_using_changed_limb = pls[1 - initial_limb]
 
-            n_edits += 1
-            edited_runs.append(run)
+            # trust limb on initial note, unless starting with other limb is better by threshold
+            if change_limb_score > initial_limb_score + 1:
+                pred_limbs = pl_using_changed_limb
+            else:
+                pred_limbs = pl_using_initial_limb
+            
+            n_edits_mlscore += 1
+            edited_runs_mlscore.append(run)
 
         if self.verbose:
-            logger.debug(f'Found {runs=}')
-            logger.debug(f'Corrected {n_edits} no-jack run sections: {edited_runs=}')
+            logger.debug(f'Corrected no-jack run sections ...')
+            logger.debug(f'Corrected {n_edits_reasoner} sections with reasoner: {edited_runs_reasoner=}')
+            logger.debug(f'Corrected {n_edits_mlscore} sections with ML scorer: {edited_runs_mlscore=}')
         return pred_limbs
 
     """

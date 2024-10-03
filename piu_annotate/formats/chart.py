@@ -21,6 +21,7 @@ def is_active_symbol(sym: str) -> bool:
 
 
 def right_index(items: list[any], query: any) -> int:
+    """ Gets the index of the right-most item in `items` matching `query`. """
     return len(items) - 1 - items[::-1].index(query)
 
 
@@ -364,9 +365,9 @@ class ChartStruct:
         return
 
     def annotate_line_repeats_previous(self) -> None:
-        """ Adds column `__line repeats previous` to df,
-            which is True if current line is the same as previous or next line
-            with downpress.
+        """ Adds column `__line repeats previous downpress line` to df,
+            which is True if current line is the same
+            as the previous line with downpress.
         """
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
         lines = list(self.df['Line'])
@@ -385,13 +386,13 @@ class ChartStruct:
 
             line_repeats.append(repeats)
 
-        self.df['__line repeats previous'] = line_repeats
+        self.df['__line repeats previous downpress line'] = line_repeats
         return
 
     def annotate_line_repeats_next(self) -> None:
-        """ Adds column `__line repeats next` to df,
-            which is True if current line is the same as previous or next line
-            with downpress.
+        """ Adds column `__line repeats next downpress line` to df,
+            which is True if current line is the same 
+            as the next line with downpress.
         """
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
         lines = list(self.df['Line'])
@@ -410,7 +411,7 @@ class ChartStruct:
 
             line_repeats.append(repeats)
 
-        self.df['__line repeats next'] = line_repeats
+        self.df['__line repeats next downpress line'] = line_repeats
         return
 
     def annotate_num_downpresses(self) -> None:

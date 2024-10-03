@@ -38,9 +38,15 @@ class ChartStructFeaturizer:
         self.row_idx_to_prevs = self.cs.get_previous_used_pred_coord()
 
         # Featurize all arrows: 1, 2, 3
-        self.arrowdatapoints = self.get_arrowdatapoints()
-        self.pt_array = [pt.to_array_categorical() for pt in self.arrowdatapoints]
-        self.pt_feature_names = self.arrowdatapoints[0].get_feature_names_categorical()
+        self.arrowdatapoints_with_3 = self.get_arrowdatapoints(with_hold_release = True)
+        self.arrowdatapoints_without_3 = self.get_arrowdatapoints(with_hold_release = False)
+        if self.context_with_hold_release:
+            self.arrowdatapoints_ft = self.arrowdatapoints_with_3
+        else:
+            self.arrowdatapoints_ft = self.arrowdatapoints_without_3
+
+        self.pt_array = [pt.to_array_categorical() for pt in self.arrowdatapoints_ft]
+        self.pt_feature_names = self.arrowdatapoints_ft[0].get_feature_names_categorical()
 
         self.chart_metadata_features = self.get_chart_metadata_features()
 
@@ -52,7 +58,7 @@ class ChartStructFeaturizer:
     """
         Build
     """    
-    def get_arrowdatapoints(self) -> list[ArrowDataPoint]:
+    def get_arrowdatapoints(self, with_hold_release: bool) -> list[ArrowDataPoint]:
         """ Featurize chart into ArrowDataPoints
 
             Options
@@ -63,7 +69,7 @@ class ChartStructFeaturizer:
         all_arrowdatapoints = []
         ac_to_time_last_arrow_use = self.cs.get_time_since_last_same_arrow_use()
 
-        if self.context_with_hold_release:
+        if with_hold_release:
             coords = self.arrow_coords
         else:
             coords = self.pred_coords
@@ -81,6 +87,13 @@ class ChartStructFeaturizer:
                     if prev_line.count('0') in [4, 9]:
                         prior_line_only_releases_hold_on_this_arrow = True
 
+            next_line_only_releases_hold_on_this_arrow = False
+            if row_idx + 1 < len(self.cs.df):
+                prev_line = self.cs.df.iloc[row_idx + 1]['Line'].replace('`', '')
+                if prev_line[arrow_coord.arrow_pos] == '3':
+                    if prev_line.count('0') in [4, 9]:
+                        next_line_only_releases_hold_on_this_arrow = True
+
             arrow_pos = arrow_coord.arrow_pos
             point = ArrowDataPoint(
                 arrow_pos = arrow_pos,
@@ -92,10 +105,11 @@ class ChartStructFeaturizer:
                 time_since_prev_downpress = row['__time since prev downpress'],
                 num_downpress_in_line = line.count('1') + line.count('2'),
                 line_is_bracketable = line_is_bracketable,
-                line_repeats_previous = row['__line repeats previous'],
-                line_repeats_next = row['__line repeats next'],
+                line_repeats_previous_downpress_line = row['__line repeats previous downpress line'],
+                line_repeats_next_downpress_line = row['__line repeats next downpress line'],
                 singles_or_doubles = self.singles_or_doubles,
                 prev_pc_idxs = self.row_idx_to_prevs[arrow_coord.row_idx],
+                next_line_only_releases_hold_on_this_arrow = next_line_only_releases_hold_on_this_arrow,
             )
             all_arrowdatapoints.append(point)
         return all_arrowdatapoints
