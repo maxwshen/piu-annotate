@@ -26,8 +26,8 @@ class LineWithLimb:
         return hash((self.line, self.limb))
 
 
-line_patterns_to_score = {
-    # singles, upper spin
+singles_line_patterns_to_score = {
+    # upper spin
     (LineWithLimb('00010', 'l'),
      LineWithLimb('01000', 'r'),
      LineWithLimb('00100', 'l'),
@@ -36,7 +36,18 @@ line_patterns_to_score = {
      LineWithLimb('00010', 'l'),
      LineWithLimb('00100', 'r'),
     ): -10,
-    # doubles, middle spin
+    # lower spin
+    (LineWithLimb('00001', 'l'),
+     LineWithLimb('10000', 'r'),
+     LineWithLimb('00100', 'l'),
+    ): -10,
+    (LineWithLimb('10000', 'r'),
+     LineWithLimb('00001', 'l'),
+     LineWithLimb('00100', 'r'),
+    ): -10,
+}
+doubles_line_patterns_to_score = {
+    # middle spin
     (LineWithLimb('0000010000', 'r'),
      LineWithLimb('0000001000', 'l'),
      LineWithLimb('0001000000', 'r'),
@@ -48,6 +59,15 @@ line_patterns_to_score = {
      LineWithLimb('0000010000', 'r'),
     ): -10,
 }
+for pattern, score in singles_line_patterns_to_score.items():
+    dp1 = tuple(LineWithLimb(l.line + '0'*5, l.limb) for l in pattern)
+    doubles_line_patterns_to_score[dp1] = score
+    dp2 = tuple(LineWithLimb('0'*5 + l.line, l.limb) for l in pattern)
+    doubles_line_patterns_to_score[dp2] = score
+
+# merged dict
+line_patterns_to_score = singles_line_patterns_to_score | doubles_line_patterns_to_score
+
 
 def count_pattern_matches(
     pattern: tuple[LineWithLimb], 
@@ -158,10 +178,13 @@ def merge(runs: list[tuple[int]]) -> list[tuple[int]]:
     return new_runs
 
 
-def find_runs_without_jacks(adps: list[ArrowDataPoint], verbose: bool = False) -> list[tuple[int]]:
+def find_runs_without_jacks(
+    adps: list[ArrowDataPoint], 
+    verbose: bool = False
+) -> list[tuple[int]]:
     """ Find runs in `adps`, returning a list of (run_start_idx, run_end_idx).
     """
-    MIN_RUN_LENGTH = args.setdefault('reason.run_no_jacks.min_run_length', 4)
+    MIN_RUN_LENGTH = args.setdefault('reason.run_no_jacks.min_run_length', 6)
 
     runs = []
     curr_run_start_idx = None

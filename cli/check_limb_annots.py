@@ -19,7 +19,7 @@ def main():
     logger.info(f'Found {len(csvs)} csvs in {folder} ...')
 
     for csv in tqdm(csvs):
-        logger.debug(csv)
+        # logger.debug(csv)
         cs = ChartStruct.from_file(csv)
         found_idxs = limbchecks.check_unforced_doublestep(cs)
 

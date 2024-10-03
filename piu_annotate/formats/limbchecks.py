@@ -51,10 +51,13 @@ def check_unforced_doublestep(cs: ChartStruct) -> list[int]:
         time_since = next_row['Time'] - row['Time']
         if time_since > 1 / 3.5:
             continue
-        if time_since < 1 / 13:
+        if time_since < 1 / 12:
+        # if time_since < 1 / 13:
             continue
         
-        if cs.get_chart_level() <= 19:            
+        if cs.get_chart_level() <= 24:
+            logger.debug(cs.source_file)
+            logger.debug((row, next_row))
             import code; code.interact(local=dict(globals(), **locals()))
         found_idxs.append(idx + 1)
 

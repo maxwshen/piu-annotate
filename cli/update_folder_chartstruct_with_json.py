@@ -28,13 +28,14 @@ def main():
     failures = []
     success = 0
     for chart_json_basename in tqdm(chart_jsons):
+        chart_json_file = os.path.join(chart_json_folder, chart_json_basename)
         chart_csv_file = chart_json_basename.replace('.json', '.csv')
         out_fn = os.path.join(output_folder, chart_csv_file)
         if os.path.isfile(out_fn):
-            continue
+            if os.path.getmtime(out_fn) > os.path.getmtime(chart_json_file):
+                continue
 
         logger.info(chart_json_basename)
-        chart_json_file = os.path.join(chart_json_folder, chart_json_basename)
         chart_json = ChartJsStruct.from_json(chart_json_file)
 
         chart_struct_csv = os.path.join(cs_folder, chart_csv_file)

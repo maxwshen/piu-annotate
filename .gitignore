@@ -2,3 +2,5 @@ data/d_annotate/
 output/
 artifacts/
 cli/temp/
+piu_annotate.egg-info/
+**/__pycache__/
