@@ -10,10 +10,47 @@ import itertools
 import numpy as np
 import math
 from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import notelines
 from piu_annotate.ml import run_reasoning
+
+class LimbUse(Enum):
+    alternate = 1
+    same = 2
+
+
+@dataclass
+class LimbReusePattern:
+    downpress_idxs: list[int]
+    limb_pattern: list[LimbUse]
+
+    @staticmethod
+    def from_run(start_dp_idx: int, end_dp_idx: int):
+        length = end_dp_idx - start_dp_idx
+        return LimbReusePattern(
+            list(range(start_dp_idx, end_dp_idx)),
+            [LimbUse.alternate] * (length - 1)
+        )
+
+    def __len__(self) -> int:
+        return len(self.downpress_idxs)
+
+    def check(self, downpress_limbs: list[int | str]) -> tuple[bool, any]:
+        """ Checks if LimbReusePattern matches `downpress_limbs`.
+            Returns OK or not, and optional object
+        """
+        limbs = [downpress_limbs[i] for i in self.downpress_idxs]
+        pairs = itertools.pairwise(limbs)
+        for i, ((la, lb), limbuse) in enumerate(zip(pairs, self.limb_pattern)):
+            if any([
+                limbuse == LimbUse.alternate and la == lb,
+                limbuse == LimbUse.same and la != lb,
+            ]):
+                return False, (self.downpress_idxs[i], self.downpress_idxs[i + 1])
+        return True, None
 
 
 class PatternReasoner:
@@ -33,41 +70,77 @@ class PatternReasoner:
         self.cs.annotate_line_repeats_previous()
         self.cs.annotate_line_repeats_next()
 
+        self.downpress_coords = self.cs.get_prediction_coordinates()
+
         self.MIN_TIME_SINCE = args.setdefault('reason.run_no_jacks.min_time_since', 1/13)
         self.MAX_TIME_SINCE = args.setdefault('reason.run_no_jacks.max_time_since', 1/3.3)
-        self.MIN_RUN_LENGTH = args.setdefault('reason.run_no_jacks.min_run_length', 6)
+        self.MIN_RUN_LENGTH = args.setdefault('reason.run_no_jacks.min_run_length', 5)
 
+    """
+        Convert between line idxs and downpress idxs
+    """
+    def line_to_downpress_idx(self, row_idx: int, limb_idx: int):
+        for dp_idx, ac in enumerate(self.downpress_coords):
+            if ac.row_idx == row_idx and ac.limb_idx == limb_idx:
+                return dp_idx
+        assert False
 
-    def nominate_sections(self):
+    def limb_annots_at_downpress_idxs(self) -> list[str]:
+        """ Get elements from Limb annotation column at downpress idxs """
+        las = []
+        limb_annots = list(self.cs.df['Limb annotation'])
+        for ac in self.downpress_coords:
+            limbs = limb_annots[ac.row_idx]
+            if limbs != '':
+                las.append(limbs[ac.limb_idx])
+            else:
+                las.append('?')
+        return las
+
+    def downpress_idx_to_time(self, dp_idx: int) -> float:
+        row_idx = self.downpress_coords[dp_idx].row_idx
+        return float(self.cs.df.iloc[row_idx]['Time'])
+
+    """
+    """
+    def nominate(self) -> list[LimbReusePattern]:
+        """ Nominate sections with runs in self.df,
+            returning a list of (start_idx, end_idx)
+        """
         runs = self.find_runs_without_jacks()
-        return runs
-    
-    def check(self):
+        return [LimbReusePattern.from_run(run[0], run[1]) for run in runs]
+
+    def check(self, breakpoint: bool = False) -> dict[str, any]:
         """ Checks limb reuse pattern on nominated chart sections
             against self.cs Limb Annotation column
 
             implicit limb pattern -- all lines alternate limbs
         """
-        runs = self.nominate_sections()
-        limb_annots = self.df['Limb annotation']
-
-        def alternates(limbs):
-            return all([
-                len(set(limbs[::2])) == 1,
-                len(set(limbs[1::2])) == 1,
-                limbs[0] != limbs[1]
-            ])
+        lr_patterns = self.nominate()
+        limb_annots = self.limb_annots_at_downpress_idxs()
 
         num_violations = 0
-        for (start, end) in runs:
-            limbs = list(limb_annots[start : end])
-            if not alternates(limbs):
-                num_violations += 1
+        time_of_violations = []
+        for lrp in lr_patterns:
+            ok, pkg = lrp.check(limb_annots)
 
-                # logger.error(self.cs.source_file)
-                # logger.error((start, end))
-                # import code; code.interact(local=dict(globals(), **locals()))            
-        return num_violations
+            if not ok:
+                bad_dp_idx1, bad_dp_idx2 = pkg
+                num_violations += 1
+                bad_time_1 = self.downpress_idx_to_time(bad_dp_idx1)
+                bad_time_2 = self.downpress_idx_to_time(bad_dp_idx2)
+                time_of_violations.append((bad_time_1, bad_time_2))
+
+                if breakpoint:
+                    logger.error(self.cs.source_file)
+                    logger.error((bad_time_1, bad_time_2))
+                    import code; code.interact(local=dict(globals(), **locals())) 
+        stats = {
+            'Line coverage': sum(len(lrp) for lrp in lr_patterns) / len(self.df),
+            'Num violations': num_violations,
+            'Time of violations': time_of_violations,
+        }
+        return stats
 
     """
         Find runs
@@ -133,7 +206,8 @@ class PatternReasoner:
         return new_runs
 
     def find_runs_without_jacks(self) -> list[tuple[int]]:
-        """ Find runs in self.cs, returning a list of (run_start_idx, run_end_idx).
+        """ Find runs in self.cs, returning a list of
+            (start_downpress_idx, end_downpress_idx).
         """
         runs = []
         df = self.df
@@ -159,4 +233,8 @@ class PatternReasoner:
             runs = merged_runs
         if self.verbose:
             logger.debug(f'Merged into {len(runs)}: {runs}')
-        return runs
+
+        # convert to downpress_idxs
+        dp_runs = [(self.line_to_downpress_idx(run[0], 0), 
+                    self.line_to_downpress_idx(run[1], 0)) for run in runs]
+        return dp_runs

@@ -20,7 +20,7 @@ def main():
 
         cs: ChartStruct = ChartStruct.from_file(args['chart_struct_csv'])
         reasoner = PatternReasoner(cs, verbose = True)
-        reasoner.check()
+        reasoner.check(breakpoint = True)
 
     else:
         csv_folder = args['manual_chart_struct_folder']
@@ -30,7 +30,7 @@ def main():
         dirpaths = set()
         for dirpath, _, files in os.walk(csv_folder):
             for file in files:
-                if file.endswith('.csv') and 'exclude' not in dirpath:
+                if file.endswith('.csv') and 'exclude' not in dirpath and 'piucenter' not in dirpath:
                     csvs.append(os.path.join(dirpath, file))
                     dirpaths.add(dirpath)
         logger.info(f'Found {len(csvs)} csvs in {len(dirpaths)} directories ...')
@@ -41,9 +41,19 @@ def main():
         for csv in tqdm(csvs):
             cs = ChartStruct.from_file(csv)
             reasoner = PatternReasoner(cs)
-            num_violations = reasoner.check()
-            if num_violations > 0:
-                logger.error(f'Found {num_violations=} in {csv}')
+            stats = reasoner.check()
+
+            dd['csv'].append(csv)
+            for k, v in stats.items():
+                dd[k].append(v)
+
+            if len(stats['Time of violations']):
+                logger.warning(csv)
+                logger.warning(stats['Time of violations'])
+
+        stats_df = pd.DataFrame(dd)
+        stats_df.to_csv('temp/check_pattern_reasoning_stats.csv')
+        print(stats_df.describe())
 
     logger.success('Done.')
     return
@@ -65,7 +75,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--manual_chart_struct_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092424/',
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/',
     )
     parser.add_argument(
         '--run_folder', 
