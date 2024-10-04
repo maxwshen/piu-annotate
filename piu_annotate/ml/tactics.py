@@ -17,7 +17,6 @@ from piu_annotate.ml import featurizers
 from piu_annotate.ml.models import ModelSuite
 from piu_annotate.ml.datapoints import ArrowDataPoint
 from piu_annotate.formats import notelines
-from piu_annotate.reasoning import run_reasoning
 
 
 def apply_index(array, idxs):
@@ -112,8 +111,20 @@ class Tactician:
     """
         Limb prediction handling
     """
-    def initial_predict(self) -> NDArray:
+    def initial_predict(self, init_pred_limbs: NDArray | None = None) -> NDArray:
+        """ Initial prediction using arrow_to_limb and arrowlimbs_to_limb models
+            
+            If optional `init_pred_limbs` is provided, use those values,
+            filling in missing entries (-1) with arrow_to_limb model prediction.
+            Then, run arrowlimbs_to_limb model on all.
+        """
         pred_limbs = self.predict_arrow()
+
+        if init_pred_limbs is not None:
+            # overwrite
+            mask = (init_pred_limbs != -1)
+            pred_limbs[mask] = init_pred_limbs[mask]
+
         return self.predict_arrowlimbs(pred_limbs)
 
     def flip_labels_by_score(self, pred_limbs: NDArray) -> NDArray:
@@ -384,88 +395,6 @@ class Tactician:
 
         if self.verbose and n_lines_fixed > 0:
             logger.debug(f'Fixed {n_lines_fixed} impossible lines with holds: {edited_pc_idxs=}')
-        return pred_limbs
-
-    def remove_doublesteps_in_long_nojack_runs(self, pred_limbs: NDArray) -> NDArray:
-        """ Remove doublesteps in long runs with no jacks, with constant `time_since`,
-            and each line has only one downpress.
-
-            Options in args
-            min_run_length: Minimum run length to consider
-            min_time_since: Minimum time_since to consider -- do not consider
-                runs with very low time_since as they may be staggered brackets
-            max_time_since: Max time_since to consider - do not consider notes
-                very far apart
-            max_frac_doublestep: Skip removing doublesteps for sections with many
-                predicted doublesteps - these may be staggered brackets
-        """
-        max_frac_doublestep = args.setdefault('tactic.remove_doublesteps.max_frac_doublestep', 0.40)
-        # find long runs with nojacks, using arrowdatapoints
-        adps = self.fcs.arrowdatapoints_without_3
-        runs = run_reasoning.find_runs_without_jacks(adps, verbose = self.verbose)
-
-        n_edits_reasoner = 0
-        edited_runs_reasoner = []
-        n_edits_mlscore = 0
-        edited_runs_mlscore = []
-        for run in runs:
-            limbs = pred_limbs[run[0]:run[1]]
-            n_double_steps = sum([len(list(g))-1 for k, g in itertools.groupby(limbs)])
-            if n_double_steps / len(limbs) >= max_frac_doublestep:
-                continue            
-            if n_double_steps == 0:
-                continue
-            
-            start_left_limbs = np.tile([0, 1], len(limbs) // 2 + 1)[:len(limbs)]
-            start_right_limbs = np.tile([1, 0], len(limbs) // 2 + 1)[:len(limbs)]
-
-            # 1. try using run pattern reasoner to decide limbs
-            run_adps = adps[run[0]:run[1]]
-            reason_left_score = run_reasoning.score_run(run_adps, start_left_limbs)
-            reason_right_score = run_reasoning.score_run(run_adps, start_right_limbs)
-            if reason_left_score > reason_right_score:
-                pred_limbs[run[0]:run[1]] = start_left_limbs
-                n_edits_reasoner += 1
-                edited_runs_reasoner.append(run)
-                continue
-            elif reason_left_score < reason_right_score:
-                pred_limbs[run[0]:run[1]] = start_right_limbs
-                n_edits_reasoner += 1
-                edited_runs_reasoner.append(run)
-                continue
-            # if tie, then proceed to #2
-
-            # 2. score starting w left vs right using ML models
-            left_pl = pred_limbs.copy()
-            left_pl[run[0]:run[1]] = start_left_limbs
-            start_left_score = self.score(left_pl)
-
-            right_pl = pred_limbs.copy()
-            right_pl[run[0]:run[1]] = start_right_limbs
-            start_right_score = self.score(right_pl)
-
-            # hacky; using 0 = left and 1 = right
-            initial_limb = limbs[0]
-            limb_scores = [start_left_score, start_right_score]
-            initial_limb_score = limb_scores[initial_limb]
-            change_limb_score = limb_scores[1 - initial_limb]
-            pls = [left_pl, right_pl]
-            pl_using_initial_limb = pls[initial_limb]
-            pl_using_changed_limb = pls[1 - initial_limb]
-
-            # trust limb on initial note, unless starting with other limb is better by threshold
-            if change_limb_score > initial_limb_score + 1:
-                pred_limbs = pl_using_changed_limb
-            else:
-                pred_limbs = pl_using_initial_limb
-            
-            n_edits_mlscore += 1
-            edited_runs_mlscore.append(run)
-
-        if self.verbose:
-            logger.debug(f'Corrected no-jack run sections ...')
-            logger.debug(f'Corrected {n_edits_reasoner} sections with reasoner: {edited_runs_reasoner=}')
-            logger.debug(f'Corrected {n_edits_mlscore} sections with ML scorer: {edited_runs_mlscore=}')
         return pred_limbs
 
     """

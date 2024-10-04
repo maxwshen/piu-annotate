@@ -81,7 +81,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424',
     )
     parser.add_argument(
         '--output_folder', 

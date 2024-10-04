@@ -36,6 +36,9 @@ class LimbReusePattern:
             [LimbUse.alternate] * (length - 1)
         )
 
+    def __repr__(self):
+        return f'{self.downpress_idxs[0]}-{self.downpress_idxs[-1]}'
+
     def __len__(self) -> int:
         return len(self.downpress_idxs)
 
@@ -87,24 +90,57 @@ class PatternReasoner:
         runs = self.find_runs_without_jacks()
         return [LimbReusePattern.from_run(run[0], run[1]) for run in runs]
 
+    def decide_limbs_for_pattern(self, lr_pattern: LimbReusePattern) -> NDArray | None:
+        """ Returns NDArray of limbs to use for each
+            downpress_idx in `lr_pattern`, or None to abstain
+        """
+        acs = [self.downpress_coords[i] for i in lr_pattern.downpress_idxs]
+
+        start_left_limbs = np.tile([0, 1], len(acs) // 2 + 1)[:len(acs)]
+        start_right_limbs = np.tile([1, 0], len(acs) // 2 + 1)[:len(acs)]
+
+        left_score = pattern_store.score_run(acs, start_left_limbs)
+        right_score = pattern_store.score_run(acs, start_right_limbs)
+
+        if left_score > right_score:
+            return start_left_limbs
+        elif left_score < right_score:
+            return start_right_limbs
+        return None
+
+    def propose_limbs(self) -> NDArray:
+        """ Propose limbs.
+            Returns `pred_limbs` array with -1 for unpredicted, 0 for left, 1 for right.
+        """
+        lr_patterns = self.nominate()
+
+        pred_limbs = np.array([-1] * len(self.downpress_coords))
+        edited = []
+        for lr_pattern in lr_patterns:
+            limbs = self.decide_limbs_for_pattern(lr_pattern)
+            if limbs is None:
+                continue
+
+            # edit
+            for limb, dp_idx in zip(limbs, lr_pattern.downpress_idxs):
+                pred_limbs[dp_idx] = limb
+            edited.append(lr_pattern)
+        
+        if self.verbose:
+            logger.debug(f'Found {lr_patterns=}')
+            logger.debug(f'Edited {edited}')
+            total_coverage = sum(len(lrp) for lrp in edited) / len(self.downpress_coords)
+            logger.debug(f'Coverage: {total_coverage:.2%}')
+
+        return pred_limbs
+
     def check_proposals(self):
         lr_patterns = self.nominate()
         gold_limb_annots = self.limb_annots_at_downpress_idxs()
 
         for lr_pattern in lr_patterns:
-            acs = [self.downpress_coords[i] for i in lr_pattern.downpress_idxs]
-
-            start_left_limbs = np.tile([0, 1], len(acs) // 2 + 1)[:len(acs)]
-            start_right_limbs = np.tile([1, 0], len(acs) // 2 + 1)[:len(acs)]
-
-            left_score = pattern_store.score_run(acs, start_left_limbs)
-            right_score = pattern_store.score_run(acs, start_right_limbs)
-
-            if left_score > right_score:
-                limbs = start_left_limbs
-            elif left_score < right_score:
-                limbs = start_right_limbs
-            else:
+            limbs = self.decide_limbs_for_pattern(lr_pattern)
+            if limbs is None:
                 continue
             
             limb_int_to_str = {0: 'l', 1: 'r'}
@@ -115,7 +151,6 @@ class PatternReasoner:
 
             if pred_limbs != gold_limbs:
                 import code; code.interact(local=dict(globals(), **locals()))
-
         return
 
     def check(self, breakpoint: bool = False) -> dict[str, any]:

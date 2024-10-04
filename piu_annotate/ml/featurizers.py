@@ -253,6 +253,10 @@ class ChartStructFeaturizer:
         assert len(fnames) == self.featurize_arrowlimbs_with_context(__fake_limb_probs).shape[-1]
         return fnames
 
+    def downpress_idx_to_time(self, dp_idx: int) -> float:
+        row_idx = self.pred_coords[dp_idx].row_idx
+        return float(self.cs.df.iloc[row_idx]['Time'])
+
     """
         Evaluation
     """
@@ -260,10 +264,13 @@ class ChartStructFeaturizer:
         """ Evaluate vs 'Limb annotation' column """
         labels = self.get_labels_from_limb_col('Limb annotation')
         accuracy = np.sum(labels == pred_limbs) / len(labels)
+        error_idxs = np.where(labels != pred_limbs)[0]
+        error_times = [self.downpress_idx_to_time(i) for i in error_idxs]
         eval_dict = {
             'accuracy-float': accuracy, 
             'accuracy': f'{accuracy:.2%}', 
-            'error_idxs': np.where(labels != pred_limbs),
+            'error_idxs': error_idxs,
+            'error_times': [f'{t:.2f}' for t in error_times],
         }
         if verbose:
             for k, v in eval_dict.items():
