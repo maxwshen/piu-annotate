@@ -10,7 +10,7 @@ import pandas as pd
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml.models import ModelSuite
 from piu_annotate.ml.predictor import predict
-from piu_annotate.ml.reasoners import PatternReasoner
+from piu_annotate.reasoning.reasoners import PatternReasoner
 
 
 def main():
@@ -21,6 +21,7 @@ def main():
         cs: ChartStruct = ChartStruct.from_file(args['chart_struct_csv'])
         reasoner = PatternReasoner(cs, verbose = True)
         reasoner.check(breakpoint = True)
+        # reasoner.check_proposals()
 
     else:
         csv_folder = args['manual_chart_struct_folder']
@@ -41,15 +42,17 @@ def main():
         for csv in tqdm(csvs):
             cs = ChartStruct.from_file(csv)
             reasoner = PatternReasoner(cs)
-            stats = reasoner.check()
+            # stats = reasoner.check()
 
-            dd['csv'].append(csv)
-            for k, v in stats.items():
-                dd[k].append(v)
+            # dd['csv'].append(csv)
+            # for k, v in stats.items():
+            #     dd[k].append(v)
 
-            if len(stats['Time of violations']):
-                logger.warning(csv)
-                logger.warning(stats['Time of violations'])
+            # if len(stats['Time of violations']):
+            #     logger.warning(csv)
+            #     logger.warning(stats['Time of violations'])
+
+            reasoner.check_proposals()
 
         stats_df = pd.DataFrame(dd)
         stats_df.to_csv('temp/check_pattern_reasoning_stats.csv')

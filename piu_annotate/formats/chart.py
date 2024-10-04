@@ -31,6 +31,7 @@ class ArrowCoordinate:
     arrow_pos: int
     limb_idx: int
     is_downpress: bool
+    line_with_active_holds: str
 
     def __hash__(self):
         return hash((self.row_idx, self.arrow_pos, self.limb_idx, self.is_downpress))
@@ -184,7 +185,7 @@ class ChartStruct:
     """
         Downpress view, used for limb annotation and pattern reasoning
     """
-    
+
 
     """
         Prediction
@@ -200,8 +201,9 @@ class ChartStruct:
                         row['Line with active holds'],
                         arrow_pos
                     )
+                    line_ah = row['Line with active holds'].replace('`', '')
                     is_downpress = action in list('12')
-                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, is_downpress)
+                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, is_downpress, line_ah)
                     arrow_coords.append(coord)
         return arrow_coords
 
@@ -224,8 +226,9 @@ class ChartStruct:
                         row['Line with active holds'],
                         arrow_pos
                     )
+                    line_ah = row['Line with active holds'].replace('`', '')
                     has_downpress = action in list('12')
-                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, has_downpress)
+                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, has_downpress, line_ah)
                     if last_time_used[arrow_pos] is not None:
                         ac_to_time[coord] = time - last_time_used[arrow_pos]
                     else:

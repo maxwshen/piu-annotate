@@ -17,7 +17,7 @@ from piu_annotate.ml import featurizers
 from piu_annotate.ml.models import ModelSuite
 from piu_annotate.ml.datapoints import ArrowDataPoint
 from piu_annotate.formats import notelines
-from piu_annotate.ml import run_reasoning
+from piu_annotate.reasoning import run_reasoning
 
 
 def apply_index(array, idxs):

@@ -15,7 +15,8 @@ from enum import Enum
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import notelines
-from piu_annotate.ml import run_reasoning
+from piu_annotate.reasoning import pattern_store
+
 
 class LimbUse(Enum):
     alternate = 1
@@ -77,31 +78,7 @@ class PatternReasoner:
         self.MIN_RUN_LENGTH = args.setdefault('reason.run_no_jacks.min_run_length', 5)
 
     """
-        Convert between line idxs and downpress idxs
-    """
-    def line_to_downpress_idx(self, row_idx: int, limb_idx: int):
-        for dp_idx, ac in enumerate(self.downpress_coords):
-            if ac.row_idx == row_idx and ac.limb_idx == limb_idx:
-                return dp_idx
-        assert False
-
-    def limb_annots_at_downpress_idxs(self) -> list[str]:
-        """ Get elements from Limb annotation column at downpress idxs """
-        las = []
-        limb_annots = list(self.cs.df['Limb annotation'])
-        for ac in self.downpress_coords:
-            limbs = limb_annots[ac.row_idx]
-            if limbs != '':
-                las.append(limbs[ac.limb_idx])
-            else:
-                las.append('?')
-        return las
-
-    def downpress_idx_to_time(self, dp_idx: int) -> float:
-        row_idx = self.downpress_coords[dp_idx].row_idx
-        return float(self.cs.df.iloc[row_idx]['Time'])
-
-    """
+        Core
     """
     def nominate(self) -> list[LimbReusePattern]:
         """ Nominate sections with runs in self.df,
@@ -109,6 +86,37 @@ class PatternReasoner:
         """
         runs = self.find_runs_without_jacks()
         return [LimbReusePattern.from_run(run[0], run[1]) for run in runs]
+
+    def check_proposals(self):
+        lr_patterns = self.nominate()
+        gold_limb_annots = self.limb_annots_at_downpress_idxs()
+
+        for lr_pattern in lr_patterns:
+            acs = [self.downpress_coords[i] for i in lr_pattern.downpress_idxs]
+
+            start_left_limbs = np.tile([0, 1], len(acs) // 2 + 1)[:len(acs)]
+            start_right_limbs = np.tile([1, 0], len(acs) // 2 + 1)[:len(acs)]
+
+            left_score = pattern_store.score_run(acs, start_left_limbs)
+            right_score = pattern_store.score_run(acs, start_right_limbs)
+
+            if left_score > right_score:
+                limbs = start_left_limbs
+            elif left_score < right_score:
+                limbs = start_right_limbs
+            else:
+                continue
+            
+            limb_int_to_str = {0: 'l', 1: 'r'}
+            pred_limbs = [limb_int_to_str[l] for l in limbs]
+
+            # check proposed limbs against gold standard annotations
+            gold_limbs = [gold_limb_annots[i] for i in lr_pattern.downpress_idxs]
+
+            if pred_limbs != gold_limbs:
+                import code; code.interact(local=dict(globals(), **locals()))
+
+        return
 
     def check(self, breakpoint: bool = False) -> dict[str, any]:
         """ Checks limb reuse pattern on nominated chart sections
@@ -141,6 +149,31 @@ class PatternReasoner:
             'Time of violations': time_of_violations,
         }
         return stats
+
+    """
+        Convert between line idxs and downpress idxs
+    """
+    def line_to_downpress_idx(self, row_idx: int, limb_idx: int):
+        for dp_idx, ac in enumerate(self.downpress_coords):
+            if ac.row_idx == row_idx and ac.limb_idx == limb_idx:
+                return dp_idx
+        assert False
+
+    def limb_annots_at_downpress_idxs(self) -> list[str]:
+        """ Get elements from Limb annotation column at downpress idxs """
+        las = []
+        limb_annots = list(self.cs.df['Limb annotation'])
+        for ac in self.downpress_coords:
+            limbs = limb_annots[ac.row_idx]
+            if limbs != '':
+                las.append(limbs[ac.limb_idx])
+            else:
+                las.append('?')
+        return las
+
+    def downpress_idx_to_time(self, dp_idx: int) -> float:
+        row_idx = self.downpress_coords[dp_idx].row_idx
+        return float(self.cs.df.iloc[row_idx]['Time'])
 
     """
         Find runs
