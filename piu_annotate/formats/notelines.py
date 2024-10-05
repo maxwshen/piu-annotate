@@ -50,6 +50,16 @@ def has_one_arrow(line: str) -> bool:
     return line.count('1') == 1 and (line.count('0') in [4, 9])
 
 
+def has_center_arrow(line: str) -> bool:
+    if '`' in line:
+        line = line.replace('`', '')
+    has_p2_center = False
+    if len(line) == 10:
+        has_p2_center = (line[7] in list('12'))
+    has_p1_center = line[2] in list('12')
+    return has_p1_center or has_p2_center
+
+
 def num_downpress(line: str) -> int:
     return sum(line.count(x) for x in list('12'))
 

@@ -23,18 +23,11 @@ class LimbUse(Enum):
     same = 2
 
 
-@dataclass
 class LimbReusePattern:
-    downpress_idxs: list[int]
-    limb_pattern: list[LimbUse]
-
-    @staticmethod
-    def from_run(start_dp_idx: int, end_dp_idx: int):
-        length = end_dp_idx - start_dp_idx
-        return LimbReusePattern(
-            list(range(start_dp_idx, end_dp_idx)),
-            [LimbUse.alternate] * (length - 1)
-        )
+    def __init__(self, downpress_idxs: list[int], limb_pattern: list[LimbUse]):
+        self.downpress_idxs = downpress_idxs
+        self.limb_pattern = limb_pattern
+        self.validate()
 
     def __repr__(self):
         return f'{self.downpress_idxs[0]}-{self.downpress_idxs[-1]}'
@@ -46,6 +39,7 @@ class LimbReusePattern:
         """ Checks if LimbReusePattern matches `downpress_limbs`.
             Returns OK or not, and optional object
         """
+        self.validate()
         limbs = [downpress_limbs[i] for i in self.downpress_idxs]
         pairs = itertools.pairwise(limbs)
         for i, ((la, lb), limbuse) in enumerate(zip(pairs, self.limb_pattern)):
@@ -55,6 +49,24 @@ class LimbReusePattern:
             ]):
                 return False, (self.downpress_idxs[i], self.downpress_idxs[i + 1])
         return True, None
+
+    def fill_limbs(self, starting_limb: str) -> NDArray:
+        """ `starting_limb`: 'left' or 'right'
+            Fills limbs from `starting_limb` using self.limb_pattern.
+            Returns NDArray
+        """
+        self.validate()
+        assert starting_limb in ['left', 'right']
+        limbs = [0] if starting_limb == 'left' else [1]
+        for limbuse in self.limb_pattern:
+            if limbuse == LimbUse.same:
+                limbs.append(limbs[-1])
+            else:
+                limbs.append(1 - limbs[-1])
+        return np.array(limbs)
+
+    def validate(self):
+        assert len(self.downpress_idxs) == len(self.limb_pattern) + 1
 
 
 class PatternReasoner:
@@ -71,6 +83,7 @@ class PatternReasoner:
         self.verbose = verbose
 
         self.cs.annotate_time_since_downpress()
+        self.cs.annotate_time_to_next_downpress()
         self.cs.annotate_line_repeats_previous()
         self.cs.annotate_line_repeats_next()
 
@@ -87,8 +100,7 @@ class PatternReasoner:
         """ Nominate sections with runs in self.df,
             returning a list of (start_idx, end_idx)
         """
-        runs = self.find_runs_without_jacks()
-        return [LimbReusePattern.from_run(run[0], run[1]) for run in runs]
+        return self.find_runs()
 
     def decide_limbs_for_pattern(self, lr_pattern: LimbReusePattern) -> NDArray | None:
         """ Returns NDArray of limbs to use for each
@@ -96,8 +108,8 @@ class PatternReasoner:
         """
         acs = [self.downpress_coords[i] for i in lr_pattern.downpress_idxs]
 
-        start_left_limbs = np.tile([0, 1], len(acs) // 2 + 1)[:len(acs)]
-        start_right_limbs = np.tile([1, 0], len(acs) // 2 + 1)[:len(acs)]
+        start_left_limbs = lr_pattern.fill_limbs('left')
+        start_right_limbs = lr_pattern.fill_limbs('right')
 
         left_score = pattern_store.score_run(acs, start_left_limbs)
         right_score = pattern_store.score_run(acs, start_right_limbs)
@@ -131,28 +143,17 @@ class PatternReasoner:
             logger.debug(f'Edited {edited}')
             total_coverage = sum(len(lrp) for lrp in edited) / len(self.downpress_coords)
             logger.debug(f'Coverage: {total_coverage:.2%}')
+            for lrp in lr_patterns:
+                if lrp not in edited:
+                    t1 = self.downpress_idx_to_time(lrp.downpress_idxs[0])
+                    t2 = self.downpress_idx_to_time(lrp.downpress_idxs[-1])
+                    logger.debug(f'Not edited: {(t1, t2)}')
 
         return pred_limbs
 
-    def check_proposals(self):
-        lr_patterns = self.nominate()
-        gold_limb_annots = self.limb_annots_at_downpress_idxs()
-
-        for lr_pattern in lr_patterns:
-            limbs = self.decide_limbs_for_pattern(lr_pattern)
-            if limbs is None:
-                continue
-            
-            limb_int_to_str = {0: 'l', 1: 'r'}
-            pred_limbs = [limb_int_to_str[l] for l in limbs]
-
-            # check proposed limbs against gold standard annotations
-            gold_limbs = [gold_limb_annots[i] for i in lr_pattern.downpress_idxs]
-
-            if pred_limbs != gold_limbs:
-                import code; code.interact(local=dict(globals(), **locals()))
-        return
-
+    """
+        Checks
+    """
     def check(self, breakpoint: bool = False) -> dict[str, any]:
         """ Checks limb reuse pattern on nominated chart sections
             against self.cs Limb Annotation column
@@ -164,6 +165,7 @@ class PatternReasoner:
 
         num_violations = 0
         time_of_violations = []
+        fractions_center = []
         for lrp in lr_patterns:
             ok, pkg = lrp.check(limb_annots)
 
@@ -174,16 +176,65 @@ class PatternReasoner:
                 bad_time_2 = self.downpress_idx_to_time(bad_dp_idx2)
                 time_of_violations.append((bad_time_1, bad_time_2))
 
+                lrp_start = lrp.downpress_idxs[0]
+                lrp_end = lrp.downpress_idxs[-1]
+                t1 = self.downpress_idx_to_time(lrp_start)
+                t2 = self.downpress_idx_to_time(lrp_end)
+
+                acs = self.downpress_coords[lrp_start:lrp_end]
+                is_center = lambda arrow_pos: arrow_pos == 2 or arrow_pos == 7
+                frac_center = len([ac for ac in acs if is_center(ac.arrow_pos)]) / len(acs)
+                fractions_center.append(frac_center)
+
                 if breakpoint:
                     logger.error(self.cs.source_file)
                     logger.error((bad_time_1, bad_time_2))
+                    logger.error((t1, t2))
+                    logger.error(frac_center)
                     import code; code.interact(local=dict(globals(), **locals())) 
         stats = {
             'Line coverage': sum(len(lrp) for lrp in lr_patterns) / len(self.df),
             'Num violations': num_violations,
             'Time of violations': time_of_violations,
+            'Fraction center': fractions_center,
         }
         return stats
+
+
+    def check_proposals(self, breakpoint: bool = False) -> dict[str, any]:
+        lr_patterns = self.nominate()
+        gold_limb_annots = self.limb_annots_at_downpress_idxs()
+
+        num_violations = 0
+        time_of_violations = []
+        for lrp in lr_patterns:
+            limbs = self.decide_limbs_for_pattern(lrp)
+            if limbs is None:
+                continue
+            
+            limb_int_to_str = {0: 'l', 1: 'r'}
+            pred_limbs = [limb_int_to_str[l] for l in limbs]
+
+            # check proposed limbs against gold standard annotations
+            gold_limbs = [gold_limb_annots[i] for i in lrp.downpress_idxs]
+
+            if pred_limbs != gold_limbs:
+                num_violations += 1
+                t1 = self.downpress_idx_to_time(lrp.downpress_idxs[0])
+                t2 = self.downpress_idx_to_time(lrp.downpress_idxs[-1])
+                time_of_violations.append((t1, t2))
+
+                if breakpoint:
+                    logger.error(self.cs.source_file)
+                    logger.error((t1, t2))
+                    import code; code.interact(local=dict(globals(), **locals())) 
+
+        stats = {
+            'Num violations': num_violations,
+            'Time of violations': time_of_violations,
+        }
+        return stats
+
 
     """
         Convert between line idxs and downpress idxs
@@ -192,6 +243,7 @@ class PatternReasoner:
         for dp_idx, ac in enumerate(self.downpress_coords):
             if ac.row_idx == row_idx and ac.limb_idx == limb_idx:
                 return dp_idx
+        logger.error(f'Queried bad {row_idx=}, {limb_idx=}; not found')
         assert False
 
     def limb_annots_at_downpress_idxs(self) -> list[str]:
@@ -214,20 +266,29 @@ class PatternReasoner:
         Find runs
     """
     def is_in_run(self, start_row: pd.Series, query_row: pd.Series) -> bool:
+        """ Accept jacks, unless they are on center panel, this could be footswitch
+        """
         start_line = start_row['Line with active holds']
         query_line = query_row['Line with active holds']
+        jack_on_center_panel = all([
+            query_row['__line repeats previous downpress line'],
+            notelines.has_center_arrow(query_line),
+        ])
         return all([
-            math.isclose(start_row['__time since prev downpress'],
-                         query_row['__time since prev downpress']), 
+            # math.isclose(start_row['__time since prev downpress'],
+                        #  query_row['__time since prev downpress']), 
+            start_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] < self.MAX_TIME_SINCE,
+            query_row['__time to next downpress'] >= self.MIN_TIME_SINCE,
             notelines.num_downpress(start_line) == 1,
             notelines.num_downpress(query_line) == 1,
             '4' not in start_line,
             '3' not in start_line,
             '4' not in query_line,
             '3' not in query_line,
-            not query_row['__line repeats previous downpress line'],
+            # not query_row['__line repeats previous downpress line'],
+            not jack_on_center_panel,
             '1' in start_line,
             '1' in query_line,
         ])
@@ -235,12 +296,21 @@ class PatternReasoner:
     def is_run_start(self, start_row: pd.Series, query_row: pd.Series):
         """ Returns whether `start_row` can be starting line of run """
         start_line = start_row['Line with active holds']
+        query_line = query_row['Line with active holds']
+        jack_on_center_panel = all([
+            query_row['__line repeats previous downpress line'],
+            notelines.has_center_arrow(query_line),
+        ])
         return all([
+            start_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
+            query_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
+            query_row['__time since prev downpress'] < self.MAX_TIME_SINCE,
             notelines.num_downpress(start_line) == 1,
             '1' in start_line,
             '4' not in start_line,
             '3' not in start_line,
-            not query_row['__line repeats previous downpress line'],
+            not jack_on_center_panel,
+            # not query_row['__line repeats previous downpress line'],
         ])
     
     def merge(self, runs: list[tuple[int]]) -> list[tuple[int]]:
@@ -273,9 +343,9 @@ class PatternReasoner:
             idx += 1
         return new_runs
 
-    def find_runs_without_jacks(self) -> list[tuple[int]]:
-        """ Find runs in self.cs, returning a list of
-            (start_downpress_idx, end_downpress_idx).
+    def find_runs(self) -> list[LimbReusePattern]:
+        """ Find runs in self.cs, and execute them by alternating on different
+            arrows, and repeating limb on same arrows.
         """
         runs = []
         df = self.df
@@ -289,7 +359,7 @@ class PatternReasoner:
                 else:
                     run_length = row_idx - curr_run_start_idx
                     if run_length >= self.MIN_RUN_LENGTH:
-                        if self.is_run_start(df.iloc[curr_run_start_idx - 1], df.iloc[curr_run_start_idx]):
+                        if curr_run_start_idx > 0 and self.is_run_start(df.iloc[curr_run_start_idx - 1], df.iloc[curr_run_start_idx]):
                             runs.append((curr_run_start_idx - 1, row_idx))
                         else:
                             runs.append((curr_run_start_idx, row_idx))
@@ -300,9 +370,35 @@ class PatternReasoner:
         while (merged_runs := self.merge(runs)) != runs:
             runs = merged_runs
         if self.verbose:
-            logger.debug(f'Merged into {len(runs)}: {runs}')
+            logger.debug(f'Found {len(runs)} candidate runs: {runs}')
+
+        # get limb pattern
+        limb_patterns = []
+        repeats_next_downpress = self.cs.df['__line repeats next downpress line']
+        rnd_map = {True: LimbUse.same, False: LimbUse.alternate}
+        for (start, end) in runs:
+            lp = [rnd_map[x] for x in repeats_next_downpress.iloc[start:end - 1]]
+            limb_patterns.append(lp)
 
         # convert to downpress_idxs
         dp_runs = [(self.line_to_downpress_idx(run[0], 0), 
                     self.line_to_downpress_idx(run[1], 0)) for run in runs]
-        return dp_runs
+        
+        # convert to LimbReusePatterns
+        lr_patterns: list[LimbReusePattern] = []
+        for dp_run, limb_pattern in zip(dp_runs, limb_patterns):
+            lrp = LimbReusePattern(
+                downpress_idxs = list(range(dp_run[0], dp_run[1])), 
+                limb_pattern = limb_pattern
+            )
+            lr_patterns.append(lrp)
+
+        if self.verbose:
+            logger.debug(f'Found {len(lr_patterns)} runs: {lr_patterns=}')
+            get_time = lambda dp_idx: self.downpress_idx_to_time(dp_idx)
+            times = [(f'{get_time(lrp.downpress_idxs[0]):.2f}',
+                      f'{get_time(lrp.downpress_idxs[-1]):.2f}'
+                         ) for lrp in lr_patterns]
+            logger.debug(f'Covers times: {times}')
+
+        return lr_patterns

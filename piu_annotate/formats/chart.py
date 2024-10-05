@@ -372,6 +372,24 @@ class ChartStruct:
         self.df['__time since prev downpress'] = time_since_dp
         return
 
+    def annotate_time_to_next_downpress(self) -> None:
+        """ Adds column `__time to next downpress` to df
+        """
+        has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
+        time_to_dps = []
+        for idx, row in self.df.iterrows():
+            next_dp_idxs = has_dps[idx + 1:]
+            if True in next_dp_idxs:
+                next_dp_idx = idx + 1 + next_dp_idxs.index(True)
+                
+                time_to_dp = self.df.iloc[next_dp_idx]['Time'] - row['Time']
+                time_to_dps.append(time_to_dp)
+            else:
+                time_to_dps.append(-1)
+
+        self.df['__time to next downpress'] = time_to_dps
+        return
+
     def annotate_line_repeats_previous(self) -> None:
         """ Adds column `__line repeats previous downpress line` to df,
             which is True if current line is the same

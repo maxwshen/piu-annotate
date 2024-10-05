@@ -20,8 +20,21 @@ def main():
 
         cs: ChartStruct = ChartStruct.from_file(args['chart_struct_csv'])
         reasoner = PatternReasoner(cs, verbose = True)
-        reasoner.check(breakpoint = True)
-        # reasoner.check_proposals()
+
+        logger.info(f'Checking limb reuse pattern ...')
+        stats = reasoner.check()
+        stats = reasoner.check(breakpoint = True)
+        for k, v in stats.items():
+            logger.debug(f'{k}: {v}')
+
+        logger.info(f'Checking limb proposals ...')
+        stats = reasoner.check_proposals()
+        stats = reasoner.check_proposals(breakpoint = True)
+        for k, v in stats.items():
+            logger.debug(f'{k}: {v}')
+
+        logger.info('Done')
+        import code; code.interact(local=dict(globals(), **locals()))
 
     else:
         csv_folder = args['manual_chart_struct_folder']
@@ -42,20 +55,20 @@ def main():
         for csv in tqdm(csvs):
             cs = ChartStruct.from_file(csv)
             reasoner = PatternReasoner(cs)
-            # stats = reasoner.check()
+            stats = reasoner.check()
 
-            # dd['csv'].append(csv)
-            # for k, v in stats.items():
-            #     dd[k].append(v)
+            if len(stats['Time of violations']):
+                dd['csv'].append(csv)
+                for k, v in stats.items():
+                    dd[k].append(v)
 
-            # if len(stats['Time of violations']):
-            #     logger.warning(csv)
-            #     logger.warning(stats['Time of violations'])
+                logger.warning(csv)
+                logger.warning(stats['Time of violations'])
 
-            reasoner.check_proposals()
+            # reasoner.check_proposals()
 
         stats_df = pd.DataFrame(dd)
-        stats_df.to_csv('temp/check_pattern_reasoning_stats.csv')
+        stats_df.to_csv('temp/check_pattern_reasoning_violations.csv')
         print(stats_df.describe())
 
     logger.success('Done.')

@@ -41,6 +41,27 @@ singles_line_patterns_to_score = {
      LineWithLimb('00001', 'l'),
      LineWithLimb('00100', 'r'),
     ): -10,
+    # side pattern
+    (LineWithLimb('00001', 'l'),
+     LineWithLimb('01000', 'r'),
+     LineWithLimb('00100', 'l'),
+     LineWithLimb('10000', 'r'),
+    ): -20,
+    (LineWithLimb('00010', 'l'),
+     LineWithLimb('01000', 'r'),
+     LineWithLimb('00100', 'l'),
+     LineWithLimb('10000', 'r'),
+    ): -20,
+    (LineWithLimb('10000', 'r'),
+     LineWithLimb('00010', 'l'),
+     LineWithLimb('00100', 'r'),
+     LineWithLimb('00001', 'l'),
+    ): -20,
+    (LineWithLimb('01000', 'r'),
+     LineWithLimb('00010', 'l'),
+     LineWithLimb('00100', 'r'),
+     LineWithLimb('00001', 'l'),
+    ): -20,
 }
 doubles_line_patterns_to_score = {
     # middle spin
@@ -48,12 +69,12 @@ doubles_line_patterns_to_score = {
      LineWithLimb('0000001000', 'l'),
      LineWithLimb('0001000000', 'r'),
      LineWithLimb('0000100000', 'l'),
-    ): -10,
+    ): -20,
     (LineWithLimb('0000100000', 'l'),
      LineWithLimb('0001000000', 'r'),
      LineWithLimb('0000001000', 'l'),
      LineWithLimb('0000010000', 'r'),
-    ): -10,
+    ): -20,
 }
 for pattern, score in singles_line_patterns_to_score.items():
     dp1 = tuple(LineWithLimb(l.line + '0'*5, l.limb) for l in pattern)
