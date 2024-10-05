@@ -21,13 +21,13 @@ def predict(
     """
         1. Use PatternReasoner
     """
-    pred_limbs = reasoner.propose_limbs()
+    pred_limbs, abstained_lr_patterns = reasoner.propose_limbs()
 
     """
         2. Use Tactician with ML models
     """
     score_to_limbs = dict()
-    pred_limbs = tactics.initial_predict(pred_limbs)
+    pred_limbs = tactics.initial_predict(pred_limbs, abstained_lr_patterns)
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:
         logger.info(f'Score, initial pred: {tactics.score(pred_limbs):.3f}')

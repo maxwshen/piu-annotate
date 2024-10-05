@@ -17,6 +17,7 @@ from piu_annotate.ml import featurizers
 from piu_annotate.ml.models import ModelSuite
 from piu_annotate.ml.datapoints import ArrowDataPoint
 from piu_annotate.formats import notelines
+from piu_annotate.reasoning.reasoners import LimbReusePattern
 
 
 def apply_index(array, idxs):
@@ -111,7 +112,11 @@ class Tactician:
     """
         Limb prediction handling
     """
-    def initial_predict(self, init_pred_limbs: NDArray | None = None) -> NDArray:
+    def initial_predict(
+        self, 
+        init_pred_limbs: NDArray | None = None,
+        abstained_lr_patterns: list[LimbReusePattern] = [],
+    ) -> NDArray:
         """ Initial prediction using arrow_to_limb and arrowlimbs_to_limb models
             
             If optional `init_pred_limbs` is provided, use those values,
@@ -125,6 +130,26 @@ class Tactician:
             mask = (init_pred_limbs != -1)
             pred_limbs[mask] = init_pred_limbs[mask]
 
+        # use abstained_lr_patterns
+        for lr_pattern in abstained_lr_patterns:
+            dp_idxs = lr_pattern.downpress_idxs
+            start_left_limbs = lr_pattern.fill_limbs('left')
+            start_right_limbs = lr_pattern.fill_limbs('right')
+
+            left_pl = pred_limbs.copy()
+            left_pl[dp_idxs] = start_left_limbs
+            left_score = self.score(left_pl)
+
+            right_pl = pred_limbs.copy()
+            right_pl[dp_idxs] = start_right_limbs
+            right_score = self.score(right_pl)
+
+            if left_score > right_score:
+                pred_limbs = left_pl
+            elif left_score < right_score:
+                pred_limbs = right_pl
+
+        logger.debug(f'Used ML scoring to fill in {len(abstained_lr_patterns)} abstained LimbReusePatterns')
         return self.predict_arrowlimbs(pred_limbs)
 
     def flip_labels_by_score(self, pred_limbs: NDArray) -> NDArray:

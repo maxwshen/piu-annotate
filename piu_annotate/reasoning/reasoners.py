@@ -127,10 +127,12 @@ class PatternReasoner:
         lr_patterns = self.nominate()
 
         pred_limbs = np.array([-1] * len(self.downpress_coords))
+        abstained_lr_patterns = []
         edited = []
         for lr_pattern in lr_patterns:
             limbs = self.decide_limbs_for_pattern(lr_pattern)
             if limbs is None:
+                abstained_lr_patterns.append(lr_pattern)
                 continue
 
             # edit
@@ -141,15 +143,20 @@ class PatternReasoner:
         if self.verbose:
             logger.debug(f'Found {lr_patterns=}')
             logger.debug(f'Edited {edited}')
-            total_coverage = sum(len(lrp) for lrp in edited) / len(self.downpress_coords)
-            logger.debug(f'Coverage: {total_coverage:.2%}')
+            edit_coverage = sum(len(lrp) for lrp in edited) / len(self.downpress_coords)
+            logger.debug(f'Edited coverage: {edit_coverage:.2%}')
+            total_coverage = sum(len(lrp) for lrp in lr_patterns) / len(self.downpress_coords)
+            logger.debug(f'Total coverage: {total_coverage:.2%}')
+
+            not_edited_times = []
             for lrp in lr_patterns:
                 if lrp not in edited:
                     t1 = self.downpress_idx_to_time(lrp.downpress_idxs[0])
                     t2 = self.downpress_idx_to_time(lrp.downpress_idxs[-1])
-                    logger.debug(f'Not edited: {(t1, t2)}')
+                    not_edited_times.append(f'{t1:.2f}-{t2:.2f}')
+            logger.debug(f'Not edited: {not_edited_times}')
 
-        return pred_limbs
+        return pred_limbs, abstained_lr_patterns
 
     """
         Checks

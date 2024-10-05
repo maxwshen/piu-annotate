@@ -75,6 +75,16 @@ doubles_line_patterns_to_score = {
      LineWithLimb('0000001000', 'l'),
      LineWithLimb('0000010000', 'r'),
     ): -20,
+    (LineWithLimb('0000000100', 'l'),
+     LineWithLimb('0000001000', 'r'),
+     LineWithLimb('0000010000', 'l'),
+     LineWithLimb('0000100000', 'r'),
+    ): -20,
+    (LineWithLimb('0010000000', 'r'),
+     LineWithLimb('0001000000', 'l'),
+     LineWithLimb('0000100000', 'r'),
+     LineWithLimb('0000010000', 'l'),
+    ): -20,
 }
 for pattern, score in singles_line_patterns_to_score.items():
     dp1 = tuple(LineWithLimb(l.line + '0'*5, l.limb) for l in pattern)
