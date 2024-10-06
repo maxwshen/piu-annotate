@@ -12,7 +12,7 @@ from piu_annotate.utils import make_basename_url_safe
 
 # output folder should be /chart-json/, for compatibility with make_search_json.py
 def main():
-    folder = args['chartstruct_csv_folder']
+    folder = args['chart_struct_csv_folder']
     csvs = [os.path.join(folder, fn) for fn in os.listdir(folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(csvs)} csvs in {folder} ...')
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
         Converts a folder of ChartStructs to ChartJson
     """)
     parser.add_argument(
-        '--chartstruct_csv_folder', 
+        '--chart_struct_csv_folder', 
         default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/lgbm-092124',
     )
     args.parse_args(parser)

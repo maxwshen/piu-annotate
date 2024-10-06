@@ -11,7 +11,7 @@ from piu_annotate.formats.chart import ChartStruct
 
 
 def main():
-    cs_folder = args['chartstruct_csv_folder']
+    cs_folder = args['chart_struct_csv_folder']
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
 
     json_folder = args['manual_json_folder']
@@ -71,15 +71,15 @@ if __name__ == '__main__':
             and positions.
             
             Writes a data structure of matched ChartStruct csvs to their manual json
-            to a private YAML file in `chartstruct_csv_folder`.
+            to a private YAML file in `chart_struct_csv_folder`.
             
             Use to run predictions on ChartStructs without manually annotated jsons,
             and use manual annotations otherwise.
         """
     )
     parser.add_argument(
-        '--chartstruct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/'
+        '--chart_struct_csv_folder', 
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/'
     )
     parser.add_argument(
         '--manual_json_folder', 

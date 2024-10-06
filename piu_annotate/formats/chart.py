@@ -190,6 +190,7 @@ class ChartStruct:
     """
         Prediction
     """
+    @functools.lru_cache
     def get_arrow_coordinates(self) -> list[ArrowCoordinate]:
         """ Get coordinates of arrows: 1, 2, 3"""
         arrow_coords = []
@@ -207,6 +208,7 @@ class ChartStruct:
                     arrow_coords.append(coord)
         return arrow_coords
 
+    @functools.lru_cache
     def get_prediction_coordinates(self) -> list[ArrowCoordinate]:
         """ Get arrow coordinates with downpresses for limb prediction """
         return [ac for ac in self.get_arrow_coordinates() if ac.is_downpress]
@@ -282,7 +284,7 @@ class ChartStruct:
 
     def add_limb_annotations(
         self,
-        arrow_coords: list[ArrowCoordinate],
+        pred_coords: list[ArrowCoordinate],
         limb_annots: list[str],
         new_col: str
     ) -> None:
@@ -292,17 +294,17 @@ class ChartStruct:
             Holds started with a limb will use that same limb throughout the hold
             duration.
         """
-        assert len(arrow_coords) == len(limb_annots)
-        self.init_limb_annotations(new_col)
+        assert len(pred_coords) == len(limb_annots)
+        df_limb_annots = self.init_limb_annotations()
 
-        row_arrow_to_ac = {}
-        for ac in arrow_coords:
-            row_arrow_to_ac[(ac.row_idx, ac.arrow_pos)] = ac
+        row_arrow_to_pcidx = {}
+        for pc_idx, ac in enumerate(pred_coords):
+            row_arrow_to_pcidx[(ac.row_idx, ac.arrow_pos)] = pc_idx
 
         def update_limb_annot(row_idx: int, limb_idx: int, new_limb: str):
-            prev_annot = self.df.iloc[row_idx][new_col]
+            prev_annot = df_limb_annots[row_idx]
             new_annot = prev_annot[:limb_idx] + new_limb + prev_annot[limb_idx + 1:]
-            self.df.loc[row_idx, new_col] = new_annot
+            df_limb_annots[row_idx] = new_annot
             return
 
         active_holds = {}   # arrowpos: limb
@@ -315,8 +317,7 @@ class ChartStruct:
 
                     if sym in list('12'):
                         # get new limb
-                        ac = row_arrow_to_ac[(row_idx, arrow_pos)]
-                        new_limb = limb_annots[arrow_coords.index(ac)]
+                        new_limb = limb_annots[row_arrow_to_pcidx[(row_idx, arrow_pos)]]
 
                     if sym == '1':
                         update_limb_annot(row_idx, limb_idx, new_limb)
@@ -336,17 +337,17 @@ class ChartStruct:
                         update_limb_annot(row_idx, limb_idx, new_limb)
 
                     limb_idx += 1
+        self.df[new_col] = df_limb_annots
         return
 
-    def init_limb_annotations(self, new_col: str) -> None:
+    def init_limb_annotations(self) -> list[str]:
         """ Initializes limb annotations to `new_col` as all ? """
         limb_annots = []
         for idx, row in self.df.iterrows():
             line = row['Line with active holds']
             n_active_symbols = sum(is_active_symbol(s) for s in line)
             limb_annots.append('?' * n_active_symbols)
-        self.df[new_col] = limb_annots
-        return
+        return limb_annots
 
     """
         Annotate
@@ -354,6 +355,8 @@ class ChartStruct:
     def annotate_time_since_downpress(self) -> None:
         """ Adds column `__time since prev downpress` to df
         """
+        if '__time since prev downpress' in self.df.columns:
+            return
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
         recent_downpress_idx = None
         time_since_dp = []
@@ -375,6 +378,8 @@ class ChartStruct:
     def annotate_time_to_next_downpress(self) -> None:
         """ Adds column `__time to next downpress` to df
         """
+        if '__time to next downpress' in self.df.columns:
+            return
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
         time_to_dps = []
         for idx, row in self.df.iterrows():
@@ -395,6 +400,8 @@ class ChartStruct:
             which is True if current line is the same
             as the previous line with downpress.
         """
+        if '__line repeats previous downpress line' in self.df.columns:
+            return
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
         lines = list(self.df['Line'])
         line_repeats = []
@@ -420,6 +427,8 @@ class ChartStruct:
             which is True if current line is the same 
             as the next line with downpress.
         """
+        if '__line repeats next downpress line' in self.df.columns:
+            return
         has_dps = [notelines.has_downpress(line) for line in self.df['Line']]
         lines = list(self.df['Line'])
         line_repeats = []

@@ -14,6 +14,7 @@ from collections import defaultdict
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.ml import featurizers
+from piu_annotate.ml.featurizers import ChartStructFeaturizer
 from piu_annotate.ml.models import ModelSuite
 from piu_annotate.ml.datapoints import ArrowDataPoint
 from piu_annotate.formats import notelines
@@ -52,15 +53,21 @@ def get_matches_prev(array: NDArray) -> NDArray:
 
 
 class Tactician:
-    def __init__(self, cs: ChartStruct, model_suite: ModelSuite, verbose: bool = False):
+    def __init__(
+        self, 
+        cs: ChartStruct, 
+        fcs: ChartStructFeaturizer, 
+        model_suite: ModelSuite, 
+        verbose: bool = False
+    ):
         """ Tactician uses a suite of ML models and a set of tactics to
             optimize predicted limb annotations for a given ChartStruct.
         """
         self.cs = cs
+        self.fcs = fcs
         self.models = model_suite
         self.verbose = verbose
         self.pred_coords = self.cs.get_prediction_coordinates()
-        self.fcs = featurizers.ChartStructFeaturizer(self.cs)
 
         self.row_idx_to_pcs: dict[int, int] = defaultdict(list)
         for pc_idx, pc in enumerate(self.pred_coords):
@@ -125,32 +132,51 @@ class Tactician:
         """
         pred_limbs = self.predict_arrow()
 
+        # Combine init_pred_limbs from reasoner with pred_limbs
         if init_pred_limbs is not None:
             # overwrite
             mask = (init_pred_limbs != -1)
             pred_limbs[mask] = init_pred_limbs[mask]
 
-        # use abstained_lr_patterns
+        pred_limbs = self.predict_arrowlimbs(pred_limbs)
+
+        # use ML scoring to decide starting limb on abstained_lr_patterns
+        # this enforces prediction follows reasoned limb reuse pattern
         for lr_pattern in abstained_lr_patterns:
-            dp_idxs = lr_pattern.downpress_idxs
-            start_left_limbs = lr_pattern.fill_limbs('left')
-            start_right_limbs = lr_pattern.fill_limbs('right')
+            pred_limbs = self.decide_limb_reuse_pattern(lr_pattern, pred_limbs)
 
-            left_pl = pred_limbs.copy()
-            left_pl[dp_idxs] = start_left_limbs
-            left_score = self.score(left_pl)
+        if self.verbose:
+            logger.debug(f'Used ML scoring to fill in {len(abstained_lr_patterns)} abstained LimbReusePatterns')
+        return pred_limbs
 
-            right_pl = pred_limbs.copy()
-            right_pl[dp_idxs] = start_right_limbs
-            right_score = self.score(right_pl)
 
-            if left_score > right_score:
-                pred_limbs = left_pl
-            elif left_score < right_score:
-                pred_limbs = right_pl
+    def decide_limb_reuse_pattern(
+        self, 
+        lr_pattern: LimbReusePattern, 
+        pred_limbs: NDArray
+    ) -> NDArray:
+        """ Use ML scoring to decide starting limb on `lr_pattern`
+            this enforces that the prediction adheres to limb reuse pattern from reasoner
+        """
+        dp_idxs = lr_pattern.downpress_idxs
+        start_left_limbs = lr_pattern.fill_limbs('left')
+        start_right_limbs = lr_pattern.fill_limbs('right')
 
-        logger.debug(f'Used ML scoring to fill in {len(abstained_lr_patterns)} abstained LimbReusePatterns')
-        return self.predict_arrowlimbs(pred_limbs)
+        left_pl = pred_limbs.copy()
+        left_pl[dp_idxs] = start_left_limbs
+        left_score = self.score(left_pl)
+
+        right_pl = pred_limbs.copy()
+        right_pl[dp_idxs] = start_right_limbs
+        right_score = self.score(right_pl)
+
+        if left_score > right_score:
+            pred_limbs = left_pl
+        elif left_score < right_score:
+            pred_limbs = right_pl
+
+        return pred_limbs
+
 
     def flip_labels_by_score(self, pred_limbs: NDArray) -> NDArray:
         """ Flips individual limbs by improvement score.

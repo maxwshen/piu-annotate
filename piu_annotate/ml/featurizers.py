@@ -38,10 +38,9 @@ class ChartStructFeaturizer:
         self.row_idx_to_prevs = self.cs.get_previous_used_pred_coord()
 
         # Featurize all arrows: 1, 2, 3
-        self.arrowdatapoints_with_3 = self.get_arrowdatapoints(with_hold_release = True)
         self.arrowdatapoints_without_3 = self.get_arrowdatapoints(with_hold_release = False)
         if self.context_with_hold_release:
-            self.arrowdatapoints_ft = self.arrowdatapoints_with_3
+            self.arrowdatapoints_ft = self.get_arrowdatapoints(with_hold_release = True)
         else:
             self.arrowdatapoints_ft = self.arrowdatapoints_without_3
 

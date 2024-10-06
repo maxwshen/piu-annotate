@@ -16,7 +16,7 @@ def predict(
     """
     fcs = featurizers.ChartStructFeaturizer(cs)
     reasoner = PatternReasoner(cs, verbose = verbose)
-    tactics = Tactician(cs, model_suite, verbose = verbose)
+    tactics = Tactician(cs, fcs, model_suite, verbose = verbose)
 
     """
         1. Use PatternReasoner

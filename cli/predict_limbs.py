@@ -58,32 +58,39 @@ def main():
         os.makedirs(out_dir)
 
     stats = defaultdict(int)
-    for csv in tqdm(csv_sord):
+    # for csv in tqdm(csv_sord):
+    csvs = csv_sord
+
+    time_profile_mode = args.setdefault('time_profile', False)
+    if time_profile_mode:
+        csvs = csvs[:10]
+
+    for csv in tqdm(csvs):
         cs: ChartStruct = ChartStruct.from_file(csv)
         if cs.singles_or_doubles() != singles_or_doubles:
             continue
 
         out_fn = os.path.join(out_dir, os.path.basename(csv))
-        if os.path.isfile(out_fn):
+        if os.path.isfile(out_fn) and not time_profile_mode:
             continue
 
         try:
             if csv in cs_to_manual:
-                logger.debug(f'updating with manual - {csv}')
+                logger.info(f'updating with manual - {csv}')
                 # if existing manual, load that json, and update cs with json
                 manual_json = cs_to_manual[csv]
                 cjs = ChartJsStruct.from_json(manual_json)
                 cs.update_from_manual_json(cjs)
                 stats['N updated from manual'] += 1
             else:
-                logger.debug(f'predicting - {csv}')
+                # logger.debug(f'predicting - {csv}')
                 cs, fcs, pred_limbs = predict(cs, model_suite)
             
                 # annotate
-                arrow_coords = cs.get_arrow_coordinates()
+                pred_coords = cs.get_prediction_coordinates()
                 int_to_limb = {0: 'l', 1: 'r'}
                 pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
-                cs.add_limb_annotations(arrow_coords, pred_limb_strs, 'Limb annotation')
+                cs.add_limb_annotations(pred_coords, pred_limb_strs, 'Limb annotation')
                 stats['N predicted'] += 1
         except Exception as e:
             logger.error(str(e))
@@ -103,14 +110,18 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/',
     )
     parser.add_argument(
         '--singles_or_doubles', 
         default = 'singles',
     )
+    parser.add_argument(
+        '--time_profile', 
+        default = False,
+    )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/092124/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/100624/model-config.yaml'
     )
     main()

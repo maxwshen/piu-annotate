@@ -9,3 +9,12 @@ piucenter-dijkstra-090124/
     - Errors in .ssc parsing that have since been fixed (warps)
     - Old code grouped together very high NPS notes, impacting high level charts
     - Floating point mismatches
+
+r0729-ae0728-092124
+    Contains phoenix-accessible stepcharts, from Rayden repo (7/29) and ArrowEclipse
+    chart data (7/28), up to Phoenix v2.01.
+
+092424
+    Most current collection with 3839 stepcharts, with up-to-date .ssc parsing
+    on fakes and warps. Contains phoenix-accessible stepcharts, from Rayden repo (7/29)
+    and ArrowEclipse chart data (7/28), up to Phoenix v2.01.
