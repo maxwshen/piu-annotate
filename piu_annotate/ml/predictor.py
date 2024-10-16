@@ -33,6 +33,12 @@ def predict(
         logger.info(f'Score, initial pred: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)
 
+    pred_limbs = tactics.enforce_arrow_after_hold_release(pred_limbs)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
+    if verbose:
+        logger.info(f'Score, arrow after hold release: {tactics.score(pred_limbs):.3f}')
+        fcs.evaluate(pred_limbs, verbose = True)
+
     pred_limbs = tactics.flip_labels_by_score(pred_limbs)
     score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
     if verbose:

@@ -138,6 +138,8 @@ class Tactician:
             mask = (init_pred_limbs != -1)
             pred_limbs[mask] = init_pred_limbs[mask]
 
+        pred_limbs = self.enforce_arrow_after_hold_release(pred_limbs)
+
         pred_limbs = self.predict_arrowlimbs(pred_limbs)
 
         # use ML scoring to decide starting limb on abstained_lr_patterns
@@ -148,7 +150,6 @@ class Tactician:
         if self.verbose:
             logger.debug(f'Used ML scoring to fill in {len(abstained_lr_patterns)} abstained LimbReusePatterns')
         return pred_limbs
-
 
     def decide_limb_reuse_pattern(
         self, 
@@ -176,7 +177,6 @@ class Tactician:
             pred_limbs = right_pl
 
         return pred_limbs
-
 
     def flip_labels_by_score(self, pred_limbs: NDArray) -> NDArray:
         """ Flips individual limbs by improvement score.
@@ -292,6 +292,51 @@ class Tactician:
 
         if self.verbose:
             logger.debug(f'Flipped {n_flips} sections: {flipped_ranges}')
+        return pred_limbs
+
+    def enforce_arrow_after_hold_release(self, pred_limbs: NDArray) -> NDArray:
+        """ For line with exactly one arrow (1 or 2)
+            following a line comprising one hold release,
+            enforce:
+            - Alternate limb if new arrow is different than hold arrow
+            - Same limb if new arrow matches hold arrow
+        """
+        # Find candidate lines
+        lines = [l.replace('`', '') for l in self.cs.df['Line with active holds']]
+        
+        row_idx_to_prev_pc = self.fcs.row_idx_to_prevs
+
+        n_edits = 0
+        for row_idx, (line1, line2) in enumerate(itertools.pairwise(lines)):
+            if all([
+                notelines.has_one_hold_release(line1),
+                notelines.num_downpress(line2) == 1,
+                not notelines.has_active_hold(line1),
+                not notelines.has_active_hold(line2),
+            ]):
+
+                hold_release_arrow = line1.index('3')
+                next_arrow = [i for i, s in enumerate(line2) if s != '0'][0]
+
+                hold_pc_idx = self.fcs.row_idx_to_prevs[row_idx][hold_release_arrow]
+                downpress_pc_idx = self.row_idx_to_pcs[row_idx + 1][0]
+
+                hold_limb = pred_limbs[hold_pc_idx]
+                downpress_limb = pred_limbs[downpress_pc_idx]
+
+                if hold_release_arrow == next_arrow:
+                    if hold_limb != downpress_limb:
+                        pred_limbs[downpress_pc_idx] = hold_limb
+                        n_edits += 1
+                
+                elif hold_release_arrow != next_arrow:
+                    if hold_limb == downpress_limb:
+                        pred_limbs[downpress_pc_idx] = 1 - hold_limb
+                        n_edits += 1
+
+        if self.verbose:
+            logger.debug(f'Changed {n_edits} arrows after line with one hold release')
+
         return pred_limbs
 
     def beam_search(
