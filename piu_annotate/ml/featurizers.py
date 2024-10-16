@@ -81,14 +81,14 @@ class ChartStructFeaturizer:
             prior_line_only_releases_hold_on_this_arrow = False
             row_idx = arrow_coord.row_idx
             if row_idx > 0:
-                prev_line = self.cs.df.iloc[row_idx - 1]['Line'].replace('`', '')
+                prev_line = self.cs.df.at[row_idx - 1, 'Line'].replace('`', '')
                 if prev_line[arrow_coord.arrow_pos] == '3':
                     if prev_line.count('0') in [4, 9]:
                         prior_line_only_releases_hold_on_this_arrow = True
 
             next_line_only_releases_hold_on_this_arrow = False
             if row_idx + 1 < len(self.cs.df):
-                prev_line = self.cs.df.iloc[row_idx + 1]['Line'].replace('`', '')
+                prev_line = self.cs.df.at[row_idx + 1, 'Line'].replace('`', '')
                 if prev_line[arrow_coord.arrow_pos] == '3':
                     if prev_line.count('0') in [4, 9]:
                         next_line_only_releases_hold_on_this_arrow = True
@@ -254,7 +254,7 @@ class ChartStructFeaturizer:
 
     def downpress_idx_to_time(self, dp_idx: int) -> float:
         row_idx = self.pred_coords[dp_idx].row_idx
-        return float(self.cs.df.iloc[row_idx]['Time'])
+        return float(self.cs.df.at[row_idx, 'Time'])
 
     """
         Evaluation

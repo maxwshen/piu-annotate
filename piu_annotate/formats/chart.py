@@ -365,7 +365,7 @@ class ChartStruct:
             if recent_downpress_idx is None:
                 time_since_dp.append(-1)
             else:
-                prev_dp_time = self.df.iloc[recent_downpress_idx]['Time']
+                prev_dp_time = self.df.at[recent_downpress_idx, 'Time']
                 time_since_dp.append(row['Time'] - prev_dp_time)
 
             has_dp = has_dps[idx]
@@ -387,7 +387,7 @@ class ChartStruct:
             if True in next_dp_idxs:
                 next_dp_idx = idx + 1 + next_dp_idxs.index(True)
                 
-                time_to_dp = self.df.iloc[next_dp_idx]['Time'] - row['Time']
+                time_to_dp = self.df.at[next_dp_idx, 'Time'] - row['Time']
                 time_to_dps.append(time_to_dp)
             else:
                 time_to_dps.append(-1)
@@ -552,12 +552,12 @@ class ChartStruct:
             Returns whether an update was made, or whether requested limb annotation
             was already in use (so no update made).
         """
-        line = self.df.iloc[row_idx]['Line with active holds'].replace('`', '')
+        line = self.df.at[row_idx, 'Line with active holds'].replace('`', '')
 
         if line[new_arrow_pos] not in expected_symbols:
             return False
 
-        curr_limb_annot = self.df.iloc[row_idx]['Limb annotation']          
+        curr_limb_annot = self.df.at[row_idx, 'Limb annotation']          
 
         if curr_limb_annot == '':
             n_active_symbols = sum(is_active_symbol(s) for s in line)

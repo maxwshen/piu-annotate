@@ -74,28 +74,28 @@ def main():
         if os.path.isfile(out_fn) and not time_profile_mode:
             continue
 
-        try:
-            if csv in cs_to_manual:
-                logger.info(f'updating with manual - {csv}')
-                # if existing manual, load that json, and update cs with json
-                manual_json = cs_to_manual[csv]
-                cjs = ChartJsStruct.from_json(manual_json)
-                cs.update_from_manual_json(cjs)
-                stats['N updated from manual'] += 1
-            else:
-                # logger.debug(f'predicting - {csv}')
-                cs, fcs, pred_limbs = predict(cs, model_suite)
-            
-                # annotate
-                pred_coords = cs.get_prediction_coordinates()
-                int_to_limb = {0: 'l', 1: 'r'}
-                pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
-                cs.add_limb_annotations(pred_coords, pred_limb_strs, 'Limb annotation')
-                stats['N predicted'] += 1
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(csv)
-            import code; code.interact(local=dict(globals(), **locals()))
+        # try:
+        if csv in cs_to_manual:
+            logger.info(f'updating with manual - {csv}')
+            # if existing manual, load that json, and update cs with json
+            manual_json = cs_to_manual[csv]
+            cjs = ChartJsStruct.from_json(manual_json)
+            cs.update_from_manual_json(cjs)
+            stats['N updated from manual'] += 1
+        else:
+            # logger.debug(f'predicting - {csv}')
+            cs, fcs, pred_limbs = predict(cs, model_suite)
+        
+            # annotate
+            pred_coords = cs.get_prediction_coordinates()
+            int_to_limb = {0: 'l', 1: 'r'}
+            pred_limb_strs = [int_to_limb[i] for i in pred_limbs]
+            cs.add_limb_annotations(pred_coords, pred_limb_strs, 'Limb annotation')
+            stats['N predicted'] += 1
+        # except Exception as e:
+        #     logger.error(str(e))
+        #     logger.error(csv)
+        #     import code; code.interact(local=dict(globals(), **locals()))
 
         # save to file
         cs.to_csv(out_fn)
