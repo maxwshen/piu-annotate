@@ -86,11 +86,13 @@ class PatternReasoner:
         self.cs.annotate_time_to_next_downpress()
         self.cs.annotate_line_repeats_previous()
         self.cs.annotate_line_repeats_next()
+        self.cs.annotate_num_downpresses()
+        self.cs.annotate_single_hold_ends_immediately()
 
         self.downpress_coords = self.cs.get_prediction_coordinates()
 
         self.MIN_TIME_SINCE = args.setdefault('reason.run_no_jacks.min_time_since', 1/13)
-        self.MAX_TIME_SINCE = args.setdefault('reason.run_no_jacks.max_time_since', 1/3.3)
+        self.MAX_TIME_SINCE = args.setdefault('reason.run_no_jacks.max_time_since', 1/2.5)
         self.MIN_RUN_LENGTH = args.setdefault('reason.run_no_jacks.min_run_length', 5)
 
     """
@@ -281,9 +283,15 @@ class PatternReasoner:
             query_row['__line repeats previous downpress line'],
             notelines.has_center_arrow(query_line),
         ])
+        start_ok_downpress = any([
+            '1' in start_line,
+            start_row['__single hold ends immediately']
+        ])
+        query_ok_downpress = any([
+            '1' in query_line,
+            query_row['__single hold ends immediately']
+        ])
         return all([
-            # math.isclose(start_row['__time since prev downpress'],
-                        #  query_row['__time since prev downpress']), 
             start_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] < self.MAX_TIME_SINCE,
@@ -294,10 +302,9 @@ class PatternReasoner:
             '3' not in start_line,
             '4' not in query_line,
             '3' not in query_line,
-            # not query_row['__line repeats previous downpress line'],
             not jack_on_center_panel,
-            '1' in start_line,
-            '1' in query_line,
+            start_ok_downpress,
+            query_ok_downpress,
         ])
     
     def is_run_start(self, start_row: pd.Series, query_row: pd.Series):
@@ -308,16 +315,20 @@ class PatternReasoner:
             query_row['__line repeats previous downpress line'],
             notelines.has_center_arrow(query_line),
         ])
+        start_ok_downpress = any([
+            '1' in start_line,
+            start_row['__single hold ends immediately']
+        ])
         return all([
             start_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] < self.MAX_TIME_SINCE,
             notelines.num_downpress(start_line) == 1,
-            '1' in start_line,
+            # '1' in start_line,
+            start_ok_downpress,
             '4' not in start_line,
             '3' not in start_line,
             not jack_on_center_panel,
-            # not query_row['__line repeats previous downpress line'],
         ])
     
     def merge(self, runs: list[tuple[int]]) -> list[tuple[int]]:
@@ -356,46 +367,49 @@ class PatternReasoner:
         """
         runs = []
         df = self.df
-        curr_run_start_idx = None
-        for row_idx, row in df.iterrows():
-            if curr_run_start_idx is None:
-                curr_run_start_idx = row_idx
+        curr_run = None
+        downpress_df = df[df['__num downpresses'] > 0]
+        for row_idx, row in downpress_df.iterrows():
+            if curr_run is None:
+                curr_run = [row_idx]
             else:
-                if self.is_in_run(df.iloc[curr_run_start_idx], row):
+                if self.is_in_run(df.iloc[curr_run[0]], row):
                     pass
+                    curr_run.append(row_idx)
                 else:
-                    run_length = row_idx - curr_run_start_idx
+                    run_length = len(curr_run)
                     if run_length >= self.MIN_RUN_LENGTH:
-                        if curr_run_start_idx > 0 and self.is_run_start(df.iloc[curr_run_start_idx - 1], df.iloc[curr_run_start_idx]):
-                            runs.append((curr_run_start_idx - 1, row_idx))
-                        else:
-                            runs.append((curr_run_start_idx, row_idx))
-                    curr_run_start_idx = row_idx
+                        if curr_run[0] > 0 and self.is_run_start(
+                            df.iloc[curr_run[0] - 1], 
+                            df.iloc[curr_run[0]]
+                        ):
+                            curr_run.insert(0, curr_run[0] - 1)
+                        runs.append(curr_run)
+                    curr_run = [row_idx]
 
-        if self.verbose:
-            logger.debug(f'Found {len(runs)}: {runs}')
+        # if self.verbose:
+            # logger.debug(f'Found {len(runs)}: {runs}')
         while (merged_runs := self.merge(runs)) != runs:
             runs = merged_runs
-        if self.verbose:
-            logger.debug(f'Found {len(runs)} candidate runs: {runs}')
+        # if self.verbose:
+            # logger.debug(f'Found {len(runs)} candidate runs: {runs}')
 
         # get limb pattern
         limb_patterns = []
         repeats_next_downpress = self.cs.df['__line repeats next downpress line']
         rnd_map = {True: LimbUse.same, False: LimbUse.alternate}
-        for (start, end) in runs:
-            lp = [rnd_map[x] for x in repeats_next_downpress.iloc[start:end - 1]]
+        for run in runs:
+            lp = [rnd_map[x] for x in repeats_next_downpress.iloc[run[:-1]]]
             limb_patterns.append(lp)
 
         # convert to downpress_idxs
-        dp_runs = [(self.line_to_downpress_idx(run[0], 0), 
-                    self.line_to_downpress_idx(run[1], 0)) for run in runs]
-        
+        dp_runs = [[self.line_to_downpress_idx(r, 0) for r in run] for run in runs]
+
         # convert to LimbReusePatterns
         lr_patterns: list[LimbReusePattern] = []
         for dp_run, limb_pattern in zip(dp_runs, limb_patterns):
             lrp = LimbReusePattern(
-                downpress_idxs = list(range(dp_run[0], dp_run[1])), 
+                downpress_idxs = dp_run,
                 limb_pattern = limb_pattern
             )
             lr_patterns.append(lrp)

@@ -109,6 +109,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/092924/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/101524/model-config.yaml'
     )
     main()

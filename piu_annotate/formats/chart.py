@@ -195,16 +195,15 @@ class ChartStruct:
         """ Get coordinates of arrows: 1, 2, 3"""
         arrow_coords = []
         for idx, row in self.df.iterrows():
-            line = row['Line'].replace('`', '')
+            line = row['Line with active holds'].replace('`', '')
             for arrow_pos, action in enumerate(line):
                 if action in list('123'):
                     limb_idx = notelines.get_limb_idx_for_arrow_pos(
                         row['Line with active holds'],
                         arrow_pos
                     )
-                    line_ah = row['Line with active holds'].replace('`', '')
                     is_downpress = action in list('12')
-                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, is_downpress, line_ah)
+                    coord = ArrowCoordinate(idx, arrow_pos, limb_idx, is_downpress, line)
                     arrow_coords.append(coord)
         return arrow_coords
 
@@ -397,8 +396,8 @@ class ChartStruct:
 
     def annotate_line_repeats_previous(self) -> None:
         """ Adds column `__line repeats previous downpress line` to df,
-            which is True if current line is the same
-            as the previous line with downpress.
+            which is True if current line has the same downpress
+            as the previous line with downpress (treating 1 and 2 the same).
         """
         if '__line repeats previous downpress line' in self.df.columns:
             return
@@ -424,8 +423,8 @@ class ChartStruct:
 
     def annotate_line_repeats_next(self) -> None:
         """ Adds column `__line repeats next downpress line` to df,
-            which is True if current line is the same 
-            as the next line with downpress.
+            which is True if current line has the same downpress
+            as the next line with downpress (treating 1 and 2 the same).
         """
         if '__line repeats next downpress line' in self.df.columns:
             return
@@ -453,6 +452,23 @@ class ChartStruct:
         """ Adds column `__num downpresses` to df """
         self.df['__num downpresses'] = self.df['Line'].str.count('1') + \
             self.df['Line'].str.count('2')
+        return
+
+    def annotate_single_hold_ends_immediately(self) -> None:
+        """ Adds column `__single hold ends immediately` to df """
+        if '__single hold ends immediately' in self.df.columns:
+            return
+        values = []
+        for idx, row in self.df.iterrows():
+            val = False
+            line = row['Line with active holds'].replace('`', '')
+            if notelines.has_one_hold(line):
+                next_line = self.df.at[idx + 1, 'Line with active holds'].replace('`', '')
+                if line.replace('2', '3') == next_line:
+                    val = True
+            values.append(val)
+
+        self.df['__single hold ends immediately'] = values
         return
 
     """

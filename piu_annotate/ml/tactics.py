@@ -139,8 +139,8 @@ class Tactician:
             pred_limbs[mask] = init_pred_limbs[mask]
 
         pred_limbs = self.enforce_arrow_after_hold_release(pred_limbs)
-
         pred_limbs = self.predict_arrowlimbs(pred_limbs)
+        pred_limbs = self.enforce_arrow_after_hold_release(pred_limbs)
 
         # use ML scoring to decide starting limb on abstained_lr_patterns
         # this enforces prediction follows reasoned limb reuse pattern
@@ -305,7 +305,6 @@ class Tactician:
         lines = [l.replace('`', '') for l in self.cs.df['Line with active holds']]
         
         row_idx_to_prev_pc = self.fcs.row_idx_to_prevs
-
         n_edits = 0
         for row_idx, (line1, line2) in enumerate(itertools.pairwise(lines)):
             if all([
@@ -314,11 +313,10 @@ class Tactician:
                 not notelines.has_active_hold(line1),
                 not notelines.has_active_hold(line2),
             ]):
-
                 hold_release_arrow = line1.index('3')
                 next_arrow = [i for i, s in enumerate(line2) if s != '0'][0]
 
-                hold_pc_idx = self.fcs.row_idx_to_prevs[row_idx][hold_release_arrow]
+                hold_pc_idx = row_idx_to_prev_pc[row_idx][hold_release_arrow]
                 downpress_pc_idx = self.row_idx_to_pcs[row_idx + 1][0]
 
                 hold_limb = pred_limbs[hold_pc_idx]
@@ -333,7 +331,7 @@ class Tactician:
                     if hold_limb == downpress_limb:
                         pred_limbs[downpress_pc_idx] = 1 - hold_limb
                         n_edits += 1
-
+                
         if self.verbose:
             logger.debug(f'Changed {n_edits} arrows after line with one hold release')
 

@@ -69,9 +69,17 @@ def predict(
         logger.success(f'Found {best_score=:.3f}')
 
     """
-        Attempt to fix impossible lines
+        Final tactics, to guarantee they are obeyed
     """
-    pred_limbs = tactics.detect_impossible_multihit(score_to_limbs[max(score_to_limbs)])
+    pred_limbs = score_to_limbs[max(score_to_limbs)]
+
+    pred_limbs = tactics.enforce_arrow_after_hold_release(pred_limbs)
+    score_to_limbs[tactics.score(pred_limbs)] = pred_limbs.copy()
+    if verbose:
+        logger.info(f'Score, arrow after hold release: {tactics.score(pred_limbs):.3f}')
+        fcs.evaluate(pred_limbs, verbose = True)
+
+    pred_limbs = tactics.detect_impossible_multihit(pred_limbs)
     if verbose:
         logger.info(f'Score, fix impossible multihit: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)

@@ -50,6 +50,10 @@ def has_one_arrow(line: str) -> bool:
     return line.count('1') == 1 and (line.count('0') in [4, 9])
 
 
+def has_one_hold(line: str) -> bool:
+    return line.count('2') == 1 and (line.count('0') in [4, 9])
+
+
 def has_one_hold_release(line: str) -> bool:
     return line.count('3') == 1 and (line.count('0') in [4, 9])
 
