@@ -85,9 +85,9 @@ def has_notes(line: str) -> bool:
 
 def is_hold_release(line: str) -> bool:
     if '`' in line:
-        return bool(set(line) != set(['`03']))
+        return bool(set(line) == set(['`03']))
     else:
-        return bool(set(line) != set(['03']))
+        return bool(set(line) == set(['03']))
 
 
 def has_active_hold(line: str) -> bool:

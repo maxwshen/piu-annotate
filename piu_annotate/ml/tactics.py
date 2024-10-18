@@ -68,6 +68,7 @@ class Tactician:
         self.models = model_suite
         self.verbose = verbose
         self.pred_coords = self.cs.get_prediction_coordinates()
+        self.singles_or_doubles = self.cs.singles_or_doubles()
 
         self.row_idx_to_pcs: dict[int, int] = defaultdict(list)
         for pc_idx, pc in enumerate(self.pred_coords):
@@ -151,15 +152,82 @@ class Tactician:
             logger.debug(f'Used ML scoring to fill in {len(abstained_lr_patterns)} abstained LimbReusePatterns')
         return pred_limbs
 
+    """
+        Handle limb reuse patterns
+    """
     def decide_limb_reuse_pattern(
         self, 
         lr_pattern: LimbReusePattern, 
         pred_limbs: NDArray
     ) -> NDArray:
-        """ Use ML scoring to decide starting limb on `lr_pattern`
-            this enforces that the prediction adheres to limb reuse pattern from reasoner
+        """ Decide starting limb on `lr_pattern` using several approaches,
+            including ML scoring, and looking at previous line
+            This enforces that the prediction adheres to limb reuse pattern from reasoner
         """
         dp_idxs = lr_pattern.downpress_idxs
+
+        # if lr_pattern starts on very first note
+        if dp_idxs[0] == 0:
+            first_arrow = self.pred_coords[0].arrow_pos
+            if self.singles_or_doubles == 'singles':
+                if first_arrow < 2:
+                    start_limb = 'left'
+                elif first_arrow > 2:
+                    start_limb = 'right'
+            elif self.singles_or_doubles == 'doubles':
+                if first_arrow < 5:
+                    start_limb = 'left'
+                else:
+                    start_limb = 'right'
+            pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
+            return pred_limbs
+        
+        init_idx = self.pred_coords[dp_idxs[0]].row_idx
+        time_since_downpress = self.cs.df.at[init_idx, '__time since prev downpress']
+        init_line = self.cs.df.at[init_idx, 'Line with active holds'].replace('`', '')
+        prev_line = self.cs.df.at[init_idx-1, 'Line with active holds'].replace('`', '')
+        init_arrow = self.pred_coords[dp_idxs[0]].arrow_pos
+
+        limb_map = {0: 'left', 1: 'right'}
+
+        # if previous line has single hold release only
+        row_idx_to_prev_pc = self.fcs.row_idx_to_prevs
+        if notelines.has_one_hold_release(prev_line):
+            # get pred_coord of hold release
+            hold_release_arrow = prev_line.index('3')
+            hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][hold_release_arrow]
+            hold_limb = pred_limbs[hold_pc_idx]
+
+            if hold_release_arrow == init_arrow:
+                start_limb = limb_map[hold_limb]
+            else:
+                start_limb = limb_map[1 - hold_limb]
+            pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
+            return pred_limbs
+        elif notelines.is_hold_release(prev_line):
+            # multiple hold releases
+            hold_release_arrows = [i for i, s in enumerate(prev_line) if s == '3']
+            if init_arrow in hold_release_arrows:
+                hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][init_arrow]
+                hold_limb = pred_limbs[hold_pc_idx]
+
+                # reuse same limb as hold
+                start_limb = limb_map[hold_limb]
+                pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
+                return pred_limbs
+
+        return self.ml_score_limb_reuse_pattern(lr_pattern, pred_limbs)
+
+    def ml_score_limb_reuse_pattern(
+        self, 
+        lr_pattern: LimbReusePattern, 
+        pred_limbs: NDArray
+    ) -> NDArray:
+        """ Decide limb use for `lr_pattern` using ML scoring.
+            This preserves limb reuse pattern (alternate/same) from reasoner.
+        """
+        dp_idxs = lr_pattern.downpress_idxs
+
         start_left_limbs = lr_pattern.fill_limbs('left')
         start_right_limbs = lr_pattern.fill_limbs('right')
 
@@ -175,7 +243,6 @@ class Tactician:
             pred_limbs = left_pl
         elif left_score < right_score:
             pred_limbs = right_pl
-
         return pred_limbs
 
     def flip_labels_by_score(self, pred_limbs: NDArray) -> NDArray:
@@ -313,6 +380,13 @@ class Tactician:
                 not notelines.has_active_hold(line1),
                 not notelines.has_active_hold(line2),
             ]):
+                # check if any hold release very close in time before line1
+                prev_line = self.cs.df.at[row_idx-1, 'Line with active holds']
+                if notelines.is_hold_release(prev_line):
+                    time_elapse = self.cs.df.at[row_idx, 'Time'] - self.cs.df.at[row_idx - 1, 'Time']
+                    if time_elapse < 0.1:
+                        import code; code.interact(local=dict(globals(), **locals()))
+
                 hold_release_arrow = line1.index('3')
                 next_arrow = [i for i, s in enumerate(line2) if s != '0'][0]
 
@@ -334,7 +408,6 @@ class Tactician:
                 
         if self.verbose:
             logger.debug(f'Changed {n_edits} arrows after line with one hold release')
-
         return pred_limbs
 
     def beam_search(

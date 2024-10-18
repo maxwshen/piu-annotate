@@ -319,12 +319,16 @@ class PatternReasoner:
             '1' in start_line,
             start_row['__single hold ends immediately']
         ])
-        return all([
+        # allow start_row to be very first row; 
+        start_ok_time_since = any([
             start_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
+            start_row['__time since prev downpress'] == -1,
+        ])
+        return all([
+            start_ok_time_since,
             query_row['__time since prev downpress'] >= self.MIN_TIME_SINCE,
             query_row['__time since prev downpress'] < self.MAX_TIME_SINCE,
             notelines.num_downpress(start_line) == 1,
-            # '1' in start_line,
             start_ok_downpress,
             '4' not in start_line,
             '3' not in start_line,
