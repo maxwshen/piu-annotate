@@ -168,6 +168,7 @@ class Tactician:
 
         # if lr_pattern starts on very first note
         if dp_idxs[0] == 0:
+            start_limb = None
             first_arrow = self.pred_coords[0].arrow_pos
             if self.singles_or_doubles == 'singles':
                 if first_arrow < 2:
@@ -179,42 +180,42 @@ class Tactician:
                     start_limb = 'left'
                 else:
                     start_limb = 'right'
-            pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
-            return pred_limbs
-        
-        init_idx = self.pred_coords[dp_idxs[0]].row_idx
-        time_since_downpress = self.cs.df.at[init_idx, '__time since prev downpress']
-        init_line = self.cs.df.at[init_idx, 'Line with active holds'].replace('`', '')
-        prev_line = self.cs.df.at[init_idx-1, 'Line with active holds'].replace('`', '')
-        init_arrow = self.pred_coords[dp_idxs[0]].arrow_pos
-
-        limb_map = {0: 'left', 1: 'right'}
-
-        # if previous line has single hold release only
-        row_idx_to_prev_pc = self.fcs.row_idx_to_prevs
-        if notelines.has_one_hold_release(prev_line):
-            # get pred_coord of hold release
-            hold_release_arrow = prev_line.index('3')
-            hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][hold_release_arrow]
-            hold_limb = pred_limbs[hold_pc_idx]
-
-            if hold_release_arrow == init_arrow:
-                start_limb = limb_map[hold_limb]
-            else:
-                start_limb = limb_map[1 - hold_limb]
-            pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
-            return pred_limbs
-        elif notelines.is_hold_release(prev_line):
-            # multiple hold releases
-            hold_release_arrows = [i for i, s in enumerate(prev_line) if s == '3']
-            if init_arrow in hold_release_arrows:
-                hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][init_arrow]
-                hold_limb = pred_limbs[hold_pc_idx]
-
-                # reuse same limb as hold
-                start_limb = limb_map[hold_limb]
+            if start_limb is not None:
                 pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
                 return pred_limbs
+        
+        if dp_idxs[0] > 0:
+            init_idx = self.pred_coords[dp_idxs[0]].row_idx
+            prev_line = self.cs.df.at[init_idx-1, 'Line with active holds'].replace('`', '')
+            init_arrow = self.pred_coords[dp_idxs[0]].arrow_pos
+
+            limb_map = {0: 'left', 1: 'right'}
+
+            # if previous line has single hold release only
+            row_idx_to_prev_pc = self.fcs.row_idx_to_prevs
+            if notelines.has_one_hold_release(prev_line):
+                # get pred_coord of hold release
+                hold_release_arrow = prev_line.index('3')
+                hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][hold_release_arrow]
+                hold_limb = pred_limbs[hold_pc_idx]
+
+                if hold_release_arrow == init_arrow:
+                    start_limb = limb_map[hold_limb]
+                else:
+                    start_limb = limb_map[1 - hold_limb]
+                pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
+                return pred_limbs
+            elif notelines.is_hold_release(prev_line):
+                # multiple hold releases
+                hold_release_arrows = [i for i, s in enumerate(prev_line) if s == '3']
+                if init_arrow in hold_release_arrows:
+                    hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][init_arrow]
+                    hold_limb = pred_limbs[hold_pc_idx]
+
+                    # reuse same limb as hold
+                    start_limb = limb_map[hold_limb]
+                    pred_limbs[dp_idxs] = lr_pattern.fill_limbs(start_limb)
+                    return pred_limbs
 
         return self.ml_score_limb_reuse_pattern(lr_pattern, pred_limbs)
 
