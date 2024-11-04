@@ -107,11 +107,14 @@ class ChartStruct:
     
     @staticmethod
     def from_stepchart_ssc(stepchart_ssc: StepchartSSC):
-        df, message = stepchart_ssc_to_chartstruct(stepchart_ssc)
+        df, holdticks, message = stepchart_ssc_to_chartstruct(stepchart_ssc)
         df['Line'] = [f'`{line}' for line in df['Line']]
         df['Line with active holds'] = [f'`{line}' for line in df['Line with active holds']]
         df['Limb annotation'] = ['' for line in df['Line']]
-        metadata_json = json.dumps(stepchart_ssc.get_metadata())
+
+        metadata_dict = stepchart_ssc.get_metadata()
+        metadata_dict['Hold ticks'] = holdticks
+        metadata_json = json.dumps(metadata_dict)
         df['Metadata'] = [metadata_json] + ['' for line in range(len(df)-1)]
         return ChartStruct(df)
     

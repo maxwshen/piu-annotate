@@ -78,7 +78,7 @@ def try_ssc_to_chartstruct(stepchart: StepchartSSC, out_folder: str) -> str:
     # if os.path.isfile(out_file):
     #     return 'success'
 
-    cs_df, cs_message = stepchart_ssc_to_chartstruct(stepchart)
+    cs_df, holdticks, cs_message = stepchart_ssc_to_chartstruct(stepchart)
     if cs_message == 'success':
         cs = ChartStruct.from_stepchart_ssc(stepchart)
         cs.to_csv(out_file)

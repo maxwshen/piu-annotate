@@ -15,7 +15,7 @@ from piu_annotate.formats.ssc_to_chartstruct import stepchart_ssc_to_chartstruct
 
 
 def get_num_bad_lines(stepchart: StepchartSSC) -> int:
-    cs_df, num_bad_lines = stepchart_ssc_to_chartstruct(stepchart)
+    cs_df, holdticks, num_bad_lines = stepchart_ssc_to_chartstruct(stepchart)
     return num_bad_lines
 
 

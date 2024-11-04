@@ -7,12 +7,61 @@ import copy
 from fractions import Fraction
 import pandas as pd
 from tqdm import tqdm
+import math
 from loguru import logger
 from collections import defaultdict
 import itertools
+from dataclasses import dataclass
 
 from .sscfile import StepchartSSC
 from . import notelines
+
+BEATS_PER_MEASURE = 4
+
+
+@dataclass
+class HoldTick:
+    start_time: float
+    end_time: float
+    ticks: float
+
+    def __repr__(self) -> str:
+        return f'{self.to_tuple()}'
+
+    def to_tuple(self) -> tuple[float, float, float]:
+        return (self.start_time, self.end_time, self.ticks)
+
+    def hold_length(self) -> float:
+        return self.end_time - self.start_time
+
+
+def merge_holdticks(holdticks: list[HoldTick]) -> list[HoldTick]:
+    """ Merge consecutive holdticks that start/end at same time,
+        and one hold is short
+    """
+    if len(holdticks) == 0:
+        return holdticks
+
+    def can_merge(ht1: HoldTick, ht2: HoldTick) -> bool:
+        LENGTH_THRESHOLD = 0.05 # seconds
+        short = any([
+            ht1.hold_length() <= LENGTH_THRESHOLD,
+            ht2.hold_length() <= LENGTH_THRESHOLD
+        ])
+        start_end = math.isclose(ht1.end_time, ht2.start_time)
+        return short and start_end
+
+    new_holdticks = [holdticks[0]]
+    for i in range(1, len(holdticks)):
+        ht = holdticks[i]
+        q = new_holdticks[-1]
+
+        if can_merge(q, ht):
+            merged = HoldTick(q.start_time, ht.end_time, q.ticks + ht.ticks)
+            new_holdticks[-1] = merged
+        else:
+            new_holdticks.append(ht)
+    return new_holdticks
 
 
 def edit_string(s: str, idx: int, c: chr) -> str:
@@ -22,16 +71,20 @@ def edit_string(s: str, idx: int, c: chr) -> str:
 def stepchart_ssc_to_chartstruct(
     stepchart: StepchartSSC,
     debug: bool = False,
-) -> tuple[pd.DataFrame | None, str]:
-    """ Builds df to create ChartStruct object.
-        df has one row per "line" and 
+) -> tuple[pd.DataFrame | None, list[tuple], str]:
+    """ Builds df to create ChartStruct object, converting .ssc fields
+        like BPMS, WARPS, DELAYS, STOPS, FAKES into time/beat stamps for lines.
+
+        Output df has one row per "line" and 
         cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Limb annotation'].
 
         Output
         ------
         result: pd.DataFrame | None
             Returns None if failed
+        List of HoldTick info: list[tuple]
         message: str
+            E.g., failure message
     """
     try:
         b2l = BeatToLines(stepchart)
@@ -44,11 +97,12 @@ def stepchart_ssc_to_chartstruct(
     stops = BeatToValueDict.from_string(stepchart.get('STOPS', ''))
     delays = BeatToValueDict.from_string(stepchart.get('DELAYS', ''))
     fakes = BeatToValueDict.from_string(stepchart.get('FAKES', ''))
+    holdticks = BeatToValueDict.from_string(stepchart.get('TICKCOUNTS', ''))
     beat_to_lines = b2l.beat_to_lines
 
     # aggregate all beats where anything happens
     all_beats = list(beat_to_lines.keys())
-    for bd in [warps, beat_to_bpm, stops, delays, fakes]:
+    for bd in [warps, beat_to_bpm, stops, delays, fakes, holdticks]:
         all_beats += bd.get_event_times()
     beats = sorted(list(set(all_beats)))
 
@@ -64,10 +118,12 @@ def stepchart_ssc_to_chartstruct(
     beat = 0
     time = 0
     bpm: float = beat_to_bpm[beat]
+    hold_ticks_per_beat: float = holdticks.get(beat, 4) / BEATS_PER_MEASURE
 
     empty_line = b2l.get_empty_line()
     active_holds = set()
-    fake_holds = set()
+    hold_tick_list: list[HoldTick] = []
+    curr_hold_tick = None
     num_bad_lines = 0
     dd = defaultdict(list)
     for beat_idx, beat in enumerate(beats):
@@ -77,13 +133,13 @@ def stepchart_ssc_to_chartstruct(
             Note that holds can be split into fake and real sections.
             In warps, time does not increment, and notes are fake.
         """
-        prev_beat = beats[beat_idx - 1] if beat_idx > 0 else -1
         next_beat = beats[beat_idx + 1] if beat_idx < len(beats) - 1 else max(beats) + 1
         line = beat_to_lines.get(beat, empty_line)
         comment = ''
         
         # update bpm
         bpm = beat_to_bpm.get(beat, bpm)
+        hold_ticks_per_beat = holdticks.get(beat, hold_ticks_per_beat)
 
         line_towrite = line
 
@@ -91,14 +147,7 @@ def stepchart_ssc_to_chartstruct(
             Note logic
         """
         # Add active holds (user must press for judgment) into line as 4
-        bad_line = False
-        try:
-            aug_line = notelines.add_active_holds(line_towrite, active_holds)
-        except Exception as e:
-            aug_line = line_towrite
-            bad_line = True
-            num_bad_lines += 1
-            comment = str(e)
+        aug_line = notelines.add_active_holds(line_towrite, active_holds)
 
         panel_idx_to_action = notelines.panel_idx_to_action(line)
         for panel_idx, action in panel_idx_to_action.items():
@@ -143,24 +192,46 @@ def stepchart_ssc_to_chartstruct(
                 for k, v in d.items():
                     dd[k].append(v)
 
-
         # Update active holds
-        if not bad_line:
-            for panel_idx, action in panel_idx_to_action.items():
-                if action == '2':
-                    if not in_fake_or_warp(beat):
-                        # only start holds if not in fake or warp
-                        active_holds.add(panel_idx)
-                if action == '3':
-                    if panel_idx in active_holds:
-                        active_holds.remove(panel_idx)
+        for panel_idx, action in panel_idx_to_action.items():
+            if action == '2':
+                if not in_fake_or_warp(beat):
+                    # only start holds if not in fake or warp
+                    active_holds.add(panel_idx)
+            if action == '3':
+                if panel_idx in active_holds:
+                    active_holds.remove(panel_idx)
         # end note logic
 
-        # if beat == 455.25:
-        # if beat >= 87.5:
-            # if line != empty_line:
-                # logger.debug(f'{beat=}, {active_holds=}, {line=}, {line_towrite=}, {aug_line=}')
-                # import code; code.interact(local=dict(globals(), **locals()))
+        """
+            Hold ticks logic
+            11/4/24 - implementation does not match official youtube chart hold counts,
+            but it's close -- not sure why 
+        """
+        if '3' in line:
+            # pop and store current hold tick
+            if curr_hold_tick is not None:
+                if curr_hold_tick.ticks > 0 and time != curr_hold_tick.start_time:
+                    curr_hold_tick.end_time = time
+                    hold_tick_list.append(curr_hold_tick)
+
+            if len(active_holds) == 0:
+                curr_hold_tick = None
+            else:
+                curr_hold_tick = HoldTick(time, -1, 1)
+        if '2' in line:
+            if curr_hold_tick is None:
+                # init hold tick
+                curr_hold_tick = HoldTick(time, -1, 1)
+            else:
+                # pop and store current hold tick
+                if curr_hold_tick.ticks > 0 and time != curr_hold_tick.start_time:
+                    curr_hold_tick.end_time = time
+                    hold_tick_list.append(curr_hold_tick)
+
+                # reinit hold tick
+                curr_hold_tick = HoldTick(time, -1, 1)
+
 
         # Update time if not in warp
         beat_increment = next_beat - beat
@@ -169,10 +240,11 @@ def stepchart_ssc_to_chartstruct(
             time += stops.get(beat, 0)
             time += delays.get(beat, 0)
 
+            if curr_hold_tick is not None:
+                curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
+
     df = pd.DataFrame(dd)
-    if num_bad_lines > 0:
-        return df, f'{num_bad_lines=}'
-    return df, 'success'
+    return df, [ht.to_tuple() for ht in merge_holdticks(hold_tick_list)], 'success'
 
 
 class BeatToLines:
@@ -185,7 +257,6 @@ class BeatToLines:
         self.stepchart = stepchart
         measures = [s.strip() for s in stepchart.get('NOTES', '').split(',')]
 
-        beats_per_measure = 4
         beat_to_lines = {}
         beat_to_increments = {}
         beat = 0
@@ -199,7 +270,7 @@ class BeatToLines:
                 raise ValueError(f'{num_subbeats} lines in measure is not divisible by 4')
 
             for lidx, line in enumerate(lines):
-                beat_increment = Fraction(beats_per_measure, num_subbeats)
+                beat_increment = Fraction(BEATS_PER_MEASURE, num_subbeats)
                 try:
                     line = notelines.parse_line(line)
                 except Exception as e:
