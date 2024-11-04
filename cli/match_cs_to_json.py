@@ -26,6 +26,11 @@ def main():
                 dirpaths.add(dirpath)
     logger.info(f'Found {len(json_files)} jsons in {len(dirpaths)} directories ...')
 
+    # order json_files by last modified date; more recent files are later
+    # this ensures that the most up-to-date json is used
+    fn_to_mtime = {fn: os.path.getmtime(fn) for fn in json_files}
+    json_files = sorted(json_files, key = fn_to_mtime.get)
+
     json_to_candidates = dict()
     json_to_csfn = dict()
     logger.info('Enumerating over manual json files ...')

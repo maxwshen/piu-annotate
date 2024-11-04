@@ -73,7 +73,7 @@ class LimbLabel:
 
     @staticmethod
     def from_limb_annot(annot: str):
-        mapper = {'l': 0, 'r': 1, 'h': 0}
+        mapper = {'l': 0, 'r': 1, 'h': 0, 'e': 0}
         return LimbLabel(limb = mapper[annot])
 
     def to_array(self) -> NDArray:

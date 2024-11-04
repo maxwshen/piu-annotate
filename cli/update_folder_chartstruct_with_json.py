@@ -75,9 +75,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_json_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/manual-annot-091924/',
-        # default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/manual-annot-091724/',
-        # default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/piucenter-070824-v1/',
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-jsons/manual-annot-101824/',
     )
     parser.add_argument(
         '--chart_struct_csv_folder', 
@@ -85,7 +83,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--output_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/092124/',
+        default = '/home/maxwshen/piu-annotate/artifacts/manual-chartstructs/101824/',
     )
     args.parse_args(parser)
     main()
