@@ -90,6 +90,13 @@ def is_hold_release(line: str) -> bool:
         return bool(set(line) == set(['03']))
 
 
+def is_hold_start(line: str) -> bool:
+    if '`' in line:
+        return bool(set(line) == set(['`02']))
+    else:
+        return bool(set(line) == set(['02']))
+
+
 def has_active_hold(line: str) -> bool:
     return '4' in line
 

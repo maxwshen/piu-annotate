@@ -243,6 +243,10 @@ def stepchart_ssc_to_chartstruct(
             if curr_hold_tick is not None:
                 curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
 
+    # round holdtick counts
+    for ht in hold_tick_list:
+        ht.ticks = round(ht.ticks)
+
     df = pd.DataFrame(dd)
     return df, [ht.to_tuple() for ht in merge_holdticks(hold_tick_list)], 'success'
 

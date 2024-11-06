@@ -364,7 +364,7 @@ class ChartStruct:
         time_since_dp = []
         for idx, row in self.df.iterrows():
             
-            if recent_downpress_idx is None:
+            if recent_downpress_idx is None:    
                 time_since_dp.append(-1)
             else:
                 prev_dp_time = self.df.at[recent_downpress_idx, 'Time']
