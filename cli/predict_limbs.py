@@ -72,6 +72,7 @@ def main():
 
         out_fn = os.path.join(out_dir, os.path.basename(csv))
         if os.path.isfile(out_fn) and not time_profile_mode:
+            stats['Skipped because outfile exists'] += 1
             continue
 
         # try:
@@ -100,6 +101,7 @@ def main():
         # save to file
         cs.to_csv(out_fn)
 
+    logger.info(f'{stats=}')
     logger.success('Done.')
     return
 
@@ -122,6 +124,6 @@ if __name__ == '__main__':
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/101824/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/110424/model-config.yaml'
     )
     main()

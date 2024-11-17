@@ -88,13 +88,14 @@ class ChartStruct:
             df['Limb annotation'] = ['' for i in range(len(df))]
         df['Limb annotation'] = [x if type(x) != float else ''
                                  for x in df['Limb annotation']]
+        df = df.drop([col for col in df.columns if 'Unnamed: ' in col], axis=1)
         return ChartStruct(df, source_file = csv_file)
 
     def to_csv(self, filename: str) -> None:
         metadata_json = json.dumps(self.metadata)
         if 'Metadata' not in self.df.columns or self.df['Metadata'][0] != metadata_json:
             self.df['Metadata'] = [metadata_json] + ['' for line in range(len(self.df)-1)]
-        self.df.to_csv(filename)
+        self.df.to_csv(filename, index = False)
         return
 
     @staticmethod
@@ -185,10 +186,15 @@ class ChartStruct:
             logger.warning(f'Failed to parse chart level')
             return -1
 
-    """
-        Downpress view, used for limb annotation and pattern reasoning
-    """
+    @functools.lru_cache
+    def get_lines(self) -> list[str]:
+        """ Return list of line strings, with ` removed """
+        return list(self.df['Line'].apply(lambda l: l.replace('`', '')))
 
+    @functools.lru_cache
+    def get_lines_with_active_holds(self) -> list[str]:
+        """ Return list of lines with active holds, with ` removed """
+        return list(self.df['Line with active holds'].apply(lambda l: l.replace('`', '')))
 
     """
         Prediction
@@ -355,7 +361,8 @@ class ChartStruct:
         Annotate
     """
     def annotate_time_since_downpress(self) -> None:
-        """ Adds column `__time since prev downpress` to df
+        """ Adds column `__time since prev downpress` to df.
+            Uses value -1 for first line (has no prev downpress).
         """
         if '__time since prev downpress' in self.df.columns:
             return
@@ -465,7 +472,7 @@ class ChartStruct:
         for idx, row in self.df.iterrows():
             val = False
             line = row['Line with active holds'].replace('`', '')
-            if notelines.has_one_hold(line):
+            if notelines.has_one_2(line):
                 next_line = self.df.at[idx + 1, 'Line with active holds'].replace('`', '')
                 if line.replace('2', '3') == next_line:
                     val = True

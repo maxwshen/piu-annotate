@@ -74,6 +74,9 @@ if __name__ == '__main__':
             Try to match ChartStruct with manually annotated jsons,
             fuzzy matching filenames, then computing compatibility in arrow times
             and positions.
+
+            When multiple manual jsons exist for the same stepchart, 
+            we prioritize the most recent last-modified json file.
             
             Writes a data structure of matched ChartStruct csvs to their manual json
             to a private YAML file in `chart_struct_csv_folder`.

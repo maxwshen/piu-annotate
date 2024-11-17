@@ -34,6 +34,57 @@ def panel_idx_to_action(line: str) -> dict[int, str]:
     return idx_to_action
 
 
+def get_downpress_limbs(line_with_active_holds: str, limb_annot: str) -> set[str]:
+    """ Returns tuple of limbs ('l', 'r') used for all downpresses (1/2)
+        in `line` according to `limb_annot`.
+    """
+    dp_limbs = [get_limb_for_arrow_pos(line_with_active_holds, limb_annot, arrow_pos)
+                for arrow_pos, symbol in enumerate(line_with_active_holds)
+                if symbol == '1' or symbol == '2']
+    return set(dp_limbs)
+
+
+def get_leftmost_rightfoot_panel(line_with_active_holds: str, limb_annot: str) -> int | None:
+    """ Returns index of left-most panel used by right foot for 1/2/4.
+        Returns None if right foot is not used for 1/2/4.
+    """
+    ok_symbols = set(list('124'))
+    panels = []
+    for panel, symbol in enumerate(line_with_active_holds):
+        if symbol in ok_symbols:
+            limb = get_limb_for_arrow_pos(line_with_active_holds, limb_annot, panel)
+            if limb == 'r':
+                panels.append(panel)
+    return min(panels) if panels else None
+
+
+def get_rightmost_leftfoot_panel(line_with_active_holds: str, limb_annot: str) -> int | None:
+    """ Returns index of right-most panel used by left foot for 1/2/4.
+        Returns None if left foot is not used for 1/2/4.
+    """
+    ok_symbols = set(list('124'))
+    panels = []
+    for panel, symbol in enumerate(line_with_active_holds):
+        if symbol in ok_symbols:
+            limb = get_limb_for_arrow_pos(line_with_active_holds, limb_annot, panel)
+            if limb == 'l':
+                panels.append(panel)
+    return max(panels) if panels else None
+
+
+def is_90_twist(panel1: int, panel2: int) -> bool:
+    """ Whether panels 1 and 2 form a 90-degree twist """
+    ok_90_twists = [[0, 1], [3, 4], [5, 6], [8, 9]]
+    return sorted([panel1, panel2]) in ok_90_twists
+
+
+def is_over90_twist(rightfoot_panel: int, leftfoot_panel: int) -> bool:
+    return all([
+        rightfoot_panel < leftfoot_panel,
+        not is_90_twist(rightfoot_panel, leftfoot_panel)
+    ])
+
+
 def singlesdoubles(line: str) -> str:
     if len(line.replace('`', '')) == 5:
         return 'singles'
@@ -46,15 +97,15 @@ def has_downpress(line: str) -> bool:
     return num_downpress(line) > 0
 
 
-def has_one_arrow(line: str) -> bool:
+def has_one_1(line: str) -> bool:
     return line.count('1') == 1 and (line.count('0') in [4, 9])
 
 
-def has_one_hold(line: str) -> bool:
+def has_one_2(line: str) -> bool:
     return line.count('2') == 1 and (line.count('0') in [4, 9])
 
 
-def has_one_hold_release(line: str) -> bool:
+def has_one_3(line: str) -> bool:
     return line.count('3') == 1 and (line.count('0') in [4, 9])
 
 
@@ -101,6 +152,15 @@ def has_active_hold(line: str) -> bool:
     return '4' in line
 
 
+def staggered_bracket(line1: str, line2: str) -> bool:
+    """ Whether `line1` and `line2` can be executed as a staggered bracket.
+        Only considers 1 in lines.
+    """
+    f = lambda c1, c2: '1' if bool(c1 == '1' or c2 == '1') else '0'
+    merged_line = ''.join([f(c1, c2) for c1, c2 in zip(line1, line2)])
+    return line_is_bracketable(merged_line)
+
+
 bracketable_lines = set([
     '10100', '01100', '00110', '00101',
     '1010000000',
@@ -139,11 +199,15 @@ def one_foot_multihit_possible(arrow_positions: list[int]) -> bool:
     return sorted(arrow_positions) in bracketable_arrow_positions
 
 
-def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
-    """ Given `arrow_positions`, returns a list of valid limb assignments
+def multihit_to_valid_feet(arrow_positions: list[int]) -> list[tuple[int]]:
+    """ Given `arrow_positions`, returns a list of valid feet assignments
         represented as a tuple of ints.
         Each output tuple has the same length as `arrow_positions`, and has elements
         0 = left, 1 = right, for the i-th arrow position.
+
+        This logic can be used to detect hands: hands are implied to be used
+        if the limb annotation for a multihit is not in this function's set of
+        valid feet assignments.
     """
     assert arrow_positions == sorted(arrow_positions), 'Must be sorted'
     if len(arrow_positions) == 2:
@@ -159,7 +223,7 @@ def multihit_to_valid_limbs(arrow_positions: list[int]) -> list[tuple[int]]:
                 for pos in b:
                     assign[arrow_positions.index(pos)] = 1
                 flipped = [1 - x for x in assign]
-                assignments += [assign, flipped]
+                assignments += [tuple(assign), tuple(flipped)]
         return assignments
     if len(arrow_positions) == 4:
         # Valid quad must be two brackets
@@ -187,7 +251,7 @@ def line_is_bracketable(line: str) -> bool:
         arrow_positions = sorted(downpress_idxs)
         return bool(arrow_positions in bracketable_arrow_positions)
     elif len(downpress_idxs) > 2:
-        return bool(len(multihit_to_valid_limbs(downpress_idxs)))
+        return bool(len(multihit_to_valid_feet(downpress_idxs)))
     return False
 
 

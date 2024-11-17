@@ -193,7 +193,7 @@ class Tactician:
 
             # if previous line has single hold release only
             row_idx_to_prev_pc = self.fcs.row_idx_to_prevs
-            if notelines.has_one_hold_release(prev_line):
+            if notelines.has_one_3(prev_line):
                 # get pred_coord of hold release
                 hold_release_arrow = prev_line.index('3')
                 hold_pc_idx = row_idx_to_prev_pc[init_idx - 1][hold_release_arrow]
@@ -376,7 +376,7 @@ class Tactician:
         n_edits = 0
         for row_idx, (line1, line2) in enumerate(itertools.pairwise(lines)):
             if all([
-                notelines.has_one_hold_release(line1),
+                notelines.has_one_3(line1),
                 notelines.num_downpress(line2) == 1,
                 not notelines.has_active_hold(line1),
                 not notelines.has_active_hold(line2),
@@ -465,7 +465,7 @@ class Tactician:
                 right_ok = notelines.one_foot_multihit_possible(rights)
 
                 if not (left_ok and right_ok):
-                    limb_combos = notelines.multihit_to_valid_limbs([pc.arrow_pos for pc in pcs])
+                    limb_combos = notelines.multihit_to_valid_feet([pc.arrow_pos for pc in pcs])
 
                     if len(limb_combos) == 0:
                         continue
@@ -528,7 +528,7 @@ class Tactician:
             right_ok = notelines.one_foot_multihit_possible(all_right)
             if not (left_ok and right_ok):
                 all_arrows = sorted(all_left + all_right)
-                limb_combos = notelines.multihit_to_valid_limbs(all_arrows)
+                limb_combos = notelines.multihit_to_valid_feet(all_arrows)
 
                 pos_to_pc_idxs = {pc.arrow_pos: self.pred_coords.index(pc)
                                   for pc in hold_pcs + curr_pcs}

@@ -4,6 +4,7 @@
 import math
 import itertools
 import numpy as np
+import functools
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import notelines
@@ -65,14 +66,13 @@ def calc_bpm(time_since: float, display_bpm: float | None) -> tuple[float, str]:
     return bpm_notetypes[best_idx][0], note_type_to_str[bpm_notetypes[best_idx][1]]
 
 
-def annotate_enps(cs: ChartStruct):
+@functools.lru_cache
+def calc_effective_downpress_times(cs: ChartStruct) -> list[float]:
+    """ Calculate times of effective downpresses.
+        An effective downpress is 1 or 2, where we do not count lines
+        with only hold starts if they repeat the previous line, and occur
+        soon after the previous line.
     """
-    """
-    cs.annotate_time_since_downpress()
-    cs.annotate_line_repeats_previous()
-
-    # get timestamps of effective downpresses
-
     edp_times = []
     for idx, row in cs.df.iterrows():
         time = row['Time']
@@ -91,6 +91,18 @@ def annotate_enps(cs: ChartStruct):
                     # hold repeats prev downpresses, and occurs soon after - skip
                     continue
             edp_times.append(time)
+    return edp_times
+
+
+def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
+    """ Given `cs`, creates string annotations for eNPS at specific times.
+        Returns list of times, and list of string annotations.
+    """
+    cs.annotate_time_since_downpress()
+    cs.annotate_line_repeats_previous()
+
+    # get timestamps of effective downpresses
+    edp_times = calc_effective_downpress_times(cs)
     edp_times = np.array(edp_times)
 
     time_since = edp_times[1:] - edp_times[:-1]
