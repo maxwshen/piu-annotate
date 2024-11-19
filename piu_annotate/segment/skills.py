@@ -209,7 +209,7 @@ def brackets(cs: ChartStruct) -> None:
     limb_annots = list(df['Limb annotation'])
 
     bracket_annots = [has_bracket(line, la) for line, la in zip(lines, limb_annots)]
-    cs.df['__brackets'] = bracket_annots
+    cs.df['__bracket'] = bracket_annots
     return
 
 
@@ -283,7 +283,7 @@ def jump(cs: ChartStruct) -> None:
     return
 
 
-def twists(cs: ChartStruct) -> None:
+def twists_90(cs: ChartStruct) -> None:
     df = cs.df
     lines = cs.get_lines_with_active_holds()
     limb_annots = list(df['Limb annotation'])
@@ -301,7 +301,6 @@ def twists(cs: ChartStruct) -> None:
             if leftmost_r_panel is not None and rightmost_l_panel is not None:
                 is_twist = any([
                     notelines.is_90_twist(leftmost_r_panel, rightmost_l_panel),
-                    notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
                 ])
             
         if 'l' in limb_annots[i] and 'r' in limb_annots[j]:
@@ -314,12 +313,49 @@ def twists(cs: ChartStruct) -> None:
             if leftmost_r_panel is not None and rightmost_l_panel is not None:
                 is_twist = is_twist or any([
                     notelines.is_90_twist(leftmost_r_panel, rightmost_l_panel),
+                ])
+
+        res.append(is_twist)
+
+    cs.df['__twist 90'] = res
+    return
+
+
+def twists_over90(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = cs.get_lines_with_active_holds()
+    limb_annots = list(df['Limb annotation'])
+
+    res = [False]
+    for i, j in itertools.pairwise(range(len(df))):
+        is_twist = False
+        if 'r' in limb_annots[i] and 'l' in limb_annots[j]:
+            leftmost_r_panel = notelines.get_leftmost_rightfoot_panel(
+                lines[i], limb_annots[i]
+            )
+            rightmost_l_panel = notelines.get_rightmost_leftfoot_panel(
+                lines[j], limb_annots[j]
+            )
+            if leftmost_r_panel is not None and rightmost_l_panel is not None:
+                is_twist = any([
+                    notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
+                ])
+            
+        if 'l' in limb_annots[i] and 'r' in limb_annots[j]:
+            rightmost_l_panel = notelines.get_rightmost_leftfoot_panel(
+                lines[i], limb_annots[i]
+            )
+            leftmost_r_panel = notelines.get_leftmost_rightfoot_panel(
+                lines[j], limb_annots[j]
+            )
+            if leftmost_r_panel is not None and rightmost_l_panel is not None:
+                is_twist = is_twist or any([
                     notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
                 ])
 
         res.append(is_twist)
 
-    cs.df['__twists'] = res
+    cs.df['__twist over90'] = res
     return
 
 
@@ -327,7 +363,7 @@ def side3_singles(cs: ChartStruct) -> None:
     df = cs.df
     lines = cs.get_lines_with_active_holds()
     if notelines.singlesdoubles(lines[0]) != 'singles':
-        return [False] * len(df)
+        cs.df['__side3 singles'] = [False] * len(df)
 
     left_accept = lambda line: line[-2:] == '00'
     left_idxs = [i for i, line in enumerate(lines) if left_accept(line)]
@@ -346,7 +382,7 @@ def mid4_doubles(cs: ChartStruct) -> None:
     df = cs.df
     lines = cs.get_lines_with_active_holds()
     if notelines.singlesdoubles(lines[0]) != 'doubles':
-        return [False] * len(df)
+        cs.df['__mid6 doubles'] = [False] * len(df)
 
     accept = lambda line: re.search('000....000', line) and any(x in line for x in list('1234'))
     idxs = [i for i, line in enumerate(lines) if accept(line)]
@@ -360,7 +396,7 @@ def mid6_doubles(cs: ChartStruct) -> None:
     df = cs.df
     lines = cs.get_lines_with_active_holds()
     if notelines.singlesdoubles(lines[0]) != 'doubles':
-        return [False] * len(df)
+        cs.df['__mid6 doubles'] = [False] * len(df)
 
     accept = lambda line: re.search('00......00', line) and any(x in line for x in list('1234'))
     idxs = [i for i, line in enumerate(lines) if accept(line)]
@@ -459,9 +495,10 @@ def filter_run_by_num_downpress(
 ) -> list[bool]:
     # Filter runs if they do not have enough downpresses
     ranges = bools_to_ranges(bool_list)
+    dp_adjs = list(df['__num downpresses'].astype(bool).astype(int))
     filt = []
     for start, end in ranges:
-        num_dp = sum(df['Has downpress adj.'].iloc[start:end])
+        num_dp = sum(dp_adjs[start:end])
         if num_dp >= min_dp:
             filt += [i for i in range(start, end)]
     return filter_short_runs(filt, len(df), 1)
@@ -509,7 +546,8 @@ def annotate_skills(cs: ChartStruct) -> None:
     splits(cs)
 
     jump(cs)
-    twists(cs)
+    twists_90(cs)
+    twists_over90(cs)
     return
 
 

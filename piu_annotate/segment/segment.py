@@ -3,11 +3,8 @@
 """
 from dataclasses import dataclass
 import numpy as np
-import math
 from loguru import logger
 import itertools
-
-from hmmlearn import hmm
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import nps
