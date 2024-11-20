@@ -20,6 +20,8 @@ from piu_annotate.segment.skills import annotate_skills
 
 @dataclass
 class Section:
+    start: int
+    end: int
     start_time: float
     end_time: float
 
@@ -90,54 +92,109 @@ def featurize(cs: ChartStruct) -> npt.NDArray:
     return x
 
 
-def get_best_segmentation(cs: ChartStruct) -> list[Section]:
-    x = featurize(cs)
+class Segmenter:
+    def __init__(self, cs: ChartStruct, debug: bool = False):
+        self.cs = cs
+        self.debug = debug
 
-    times = list(cs.df['Time'])
-    chart_time_len = max(times)
+        self.times = list(cs.df['Time'])
+        self.chart_time_len = max(self.times)
+        self.x = featurize(cs)
 
-    def score_segmentation(changepoints: list[int]) -> float:
-        """ Score a list of changepoints, using time lengths """
+    """
+        Scoring and costs
+    """
+    def segment_cost(self, start: int, end: int) -> float:
+        t = self.times[end] - self.times[start]
+        min_len = 7
+        max_len = 20
+        if min_len <= t <= max_len:
+            return 0
+        elif t < min_len:
+            return 10 * np.abs(t - min_len)**4
+        elif t > max_len:
+            return (t - max_len)**2
+
+    def score(self, changepoints: list[int]) -> float:
+        """ Score a list of changepoints, using time lengths.
+            Penalizes deviation from target num. changepoints,
+            and segments that are too short or too long.
+            Places heavier penalty on short sections, so errs 
+            towards longer segments.
+        """
         # ~ 1 segment per 15 seconds is roughly good
-        ideal_num_segments = chart_time_len / 15
+        ideal_num_segments = self.chart_time_len / 15
         num_cost = (len(changepoints) - ideal_num_segments) ** 2
 
-        def segment_len_cost(start: int, end: int) -> float:
-            t = times[end] - times[start]
-            min_len = 7
-            max_len = 20
-            if min_len <= t <= max_len:
-                return 0
-            elif t < min_len:
-                return 10 * np.abs(t - min_len)**4
-            elif t > max_len:
-                return (t - max_len)**2
-
-        sections = [0] + changepoints[:-1] + [len(cs.df) - 1]
-        segment_costs = [segment_len_cost(s, e) for s, e
+        sections = [0] + changepoints[:-1] + [len(self.cs.df) - 1]
+        segment_costs = [self.segment_cost(s, e) for s, e
                          in itertools.pairwise(sections)]
         return -1 * (num_cost + 0.5 * sum(segment_costs))
 
-    # Use jump=5 for faster speed, to find best penalty
-    algo = rpt.Pelt(model = 'rbf', jump = 5).fit(x)
-    penalties = np.linspace(5, 20, 10)
-    segments = [algo.predict(pen = p) for p in tqdm(penalties)]
-    scores = [score_segmentation(s) for s in segments]
+    """
+        Segmentation
+    """
+    def segment(self) -> list[Section]:
+        # perform initial segmentation
+        algo = rpt.KernelCPD(kernel = 'rbf').fit(self.x)
+        penalties = np.linspace(5, 20, 15)
+        segments = [algo.predict(pen = p) for p in penalties]
+        scores = [self.score(s) for s in segments]
+        best_idx = scores.index(max(scores))
+        best_segments = segments[best_idx]
 
-    best_idx = scores.index(max(scores))
-    best_penalty = penalties[best_idx]
-    best_segments = segments[best_idx]
-    # print(best_segments)
+        # convert changepoints to list of sections
+        best_segments.insert(0, 0)
+        # final element from ruptures is = len(df), so subtract 1 to index last element
+        best_segments[-1] -= 1
+        sections = [Section(i, j, self.times[i], self.times[j])
+                    for i, j in itertools.pairwise(best_segments)]
 
-    # Rerun with jump=1 with best penalty, for finetuning changepoints
-    algo = rpt.Pelt(model = 'rbf', jump = 1).fit(x)
-    j1_changepoints = algo.predict(pen = best_penalty)
-    return j1_changepoints
+        # try splitting long sections
+        new_sections = []
+        for section in sections:
+            if section.time_length() >= 24:
+                new_sections += self.split(section)
+            else:
+                new_sections.append(section)
+
+        if self.debug:
+            print(self.cs.df['Time'].iloc[best_segments[:-1]])
+            for s in new_sections:
+                print(s)
+            print('Entering interactive mode for debugging ...')
+            import code; code.interact(local=dict(globals(), **locals()))
+
+        return new_sections
+
+    def split(self, sec: Section) -> list[Section]:
+        """ Splits section into two if that improves score.
+        """
+        start, end = sec.start, sec.end
+        base_cost = self.segment_cost(start, end)
+        n_lines = sec.end - sec.start
+
+        algo = rpt.KernelCPD(kernel = 'rbf', min_size = n_lines // 4).fit(self.x[start : end])
+        changepoint = sec.start + algo.predict(n_bkps = 1)[0]
+        split_cost = sum([
+            self.segment_cost(start, changepoint),
+            self.segment_cost(changepoint, end)
+        ])
+
+        if split_cost <= base_cost:
+            return [
+                Section(start, changepoint, self.times[start], self.times[changepoint]),
+                Section(changepoint, end, self.times[changepoint], self.times[end])
+            ]
+        else:
+            return [sec]
 
 
-def segmentation(cs: ChartStruct) -> list[Section]:
-    result = get_best_segmentation(cs)
-    print(cs.df['Time'].iloc[result[:-1]])
-    import code; code.interact(local=dict(globals(), **locals()))
+def segmentation(cs: ChartStruct, debug: bool = False) -> list[Section]:
+    segmenter = Segmenter(cs, debug)
+    result = segmenter.segment()
+    # print(result)
+    # print(cs.df['Time'].iloc[result[:-1]])
+    # import code; code.interact(local=dict(globals(), **locals()))
 
-    return
+    return result
