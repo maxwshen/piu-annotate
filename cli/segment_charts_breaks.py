@@ -8,12 +8,12 @@ import sys
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate import utils
-from piu_annotate.segment.segment_hmm import segment_hmm
+from piu_annotate.segment.segment_breaks import segment_chart, get_segment_metadata
 
 
 def segment_single_chart(csv: str):
     cs = ChartStruct.from_file(csv)
-    num_sections = segment_hmm(cs)
+    num_sections = segment_chart(cs)
     logger.info(f'{num_sections=}')
     return
 
@@ -41,8 +41,10 @@ def main():
             logger.error(f'Failed to load {inp_fn}')
             sys.exit()
 
-        sections = segment_hmm(cs)
+        sections = segment_chart(cs)
         cs.metadata['Segments'] = [s.to_tuple() for s in sections]
+        cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
+
         # cs.to_csv(inp_fn)
 
     logger.success('done')
@@ -61,7 +63,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/My_Dreams_-_Banya_Production_D22_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/My_Dreams_-_Banya_Production_D22_ARCADE.csv',
     )
     args.parse_args(parser)
     main()
