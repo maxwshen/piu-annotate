@@ -90,12 +90,19 @@ def calc_effective_downpress_times(cs: ChartStruct) -> list[float]:
                 if all(crits):
                     # hold repeats prev downpresses, and occurs soon after - skip
                     continue
+        
+            if time < edp_times[-1] + 0.005:
+                # ignore notes very close together (faster than 200 nps);
+                # these are ssc artifacts
+                continue
             edp_times.append(time)
     return edp_times
 
 
 def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
-    """ Given `cs`, creates string annotations for eNPS at specific times.
+    """ Given `cs`, creates a short list of
+        string annotations for eNPS at specific times,
+        for chart visualization.
         Returns list of times, and list of string annotations.
     """
     cs.annotate_time_since_downpress()

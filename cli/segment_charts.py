@@ -9,6 +9,7 @@ import sys
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate import utils
 from piu_annotate.segment.segment import segmentation
+from piu_annotate.segment.segment_breaks import get_segment_metadata
 
 
 def segment_single_chart(csv: str):
@@ -43,6 +44,7 @@ def main():
 
         sections = segmentation(cs)
         cs.metadata['Segments'] = [s.to_tuple() for s in sections]
+        cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
         cs.to_csv(inp_fn)
 
     logger.success('done')
@@ -62,7 +64,7 @@ if __name__ == '__main__':
         '--csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Nyarlathotep_-_nato_S21_ARCADE.csv',
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/BOOOM!!_-_RiraN_D22_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/BOOOM!!_-_RiraN_D22_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/My_Dreams_-_Banya_Production_D22_ARCADE.csv',
     )
     args.parse_args(parser)
