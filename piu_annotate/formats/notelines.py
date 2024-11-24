@@ -85,6 +85,33 @@ def is_over90_twist(rightfoot_panel: int, leftfoot_panel: int) -> bool:
     ])
 
 
+def is_close_twist(rightfoot_panel: int, leftfoot_panel: int) -> bool:
+    if not is_over90_twist(rightfoot_panel, leftfoot_panel):
+        return False
+    # right foot is on a panel left of panel that left foot is on
+    # neighbor dict maps left-side panel to panels neighboring, on right side
+    neighbors = {
+        0: [2],
+        1: [2],
+        2: [3, 4],
+        3: [5, 6],
+        4: [5, 6],
+        5: [7],
+        6: [7],
+        7: [8, 9],
+        8: [],
+        9: [],
+    }
+    return leftfoot_panel in neighbors[rightfoot_panel]
+
+
+def is_far_twist(rightfoot_panel: int, leftfoot_panel: int) -> bool:
+    return all([
+        is_over90_twist(rightfoot_panel, leftfoot_panel),
+        not is_close_twist(rightfoot_panel, leftfoot_panel)
+    ])
+
+
 def singlesdoubles(line: str) -> str:
     if len(line.replace('`', '')) == 5:
         return 'singles'

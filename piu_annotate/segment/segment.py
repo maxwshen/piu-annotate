@@ -32,10 +32,15 @@ class Section:
         return self.start_time < other.start_time
 
     def to_tuple(self) -> tuple:
-        return (self.start_time, self.end_time)
+        return (self.start_time, self.end_time, int(self.start), int(self.end))
 
     def __contains__(self, t: float) -> bool:
         return self.start_time <= t <= self.end_time
+
+    @staticmethod
+    def from_tuple(tpl):
+        (start_time, end_time, start, end) = tpl
+        return Section(start, end, start_time, end_time)
 
 
 def featurize(cs: ChartStruct) -> npt.NDArray:

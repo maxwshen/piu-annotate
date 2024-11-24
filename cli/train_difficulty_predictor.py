@@ -17,9 +17,9 @@ from piu_annotate import utils
 from piu_annotate.difficulty import featurizers
 
 
-def build_dataset():
+def build_full_stepchart_dataset():
     # load from file if exists
-    dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/datasets/temp.pkl'
+    dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/datasets/temp.pkl'
     if not args.setdefault('rerun', False):
         if os.path.exists(dataset_fn):
             with open(dataset_fn, 'rb') as f:
@@ -33,7 +33,6 @@ def build_dataset():
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
-    from collections import defaultdict
     X = []
     Y = []
     files = []
@@ -43,7 +42,8 @@ def build_dataset():
         cs = ChartStruct.from_file(inp_fn)
 
         # featurize
-        x = featurizers.featurize(cs)
+        fter = featurizers.DifficultyFeaturizer(cs)
+        x = fter.featurize_full_stepchart()
         X.append(x)
 
         Y.append(int(cs.metadata['METER']))
@@ -53,17 +53,20 @@ def build_dataset():
     dataset = {'x': np.array(X), 'y': np.array(Y),
                'files': files, 'singles_or_doubles': singles_or_doubles}
 
-    dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/datasets/temp.pkl'
     with open(dataset_fn, 'wb') as f:
         pickle.dump(dataset, f)
     logger.info(f'Saved dataset to {dataset_fn}')
     return dataset
 
 
-def train_model(dataset: dict):
+def train_model(dataset: dict, singles_or_doubles: str):
     # train/test split
-    points = dataset['x']
-    labels = dataset['y']
+    sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
+    points = dataset['x'][sd_selector]
+    labels = dataset['y'][sd_selector]
+
+    # points = points[:, [0, 4, 8, 12]]
+    # points = points[:, [0, 1, 4, 5, 8, 9, 12, 13]]
 
     train_x, test_x, train_y, test_y = train_test_split(
         points, labels, test_size = 0.1, random_state = 0
@@ -74,24 +77,93 @@ def train_model(dataset: dict):
     params = {'objective': 'regression'}
     bst = lgb.train(params, train_data, valid_sets = [test_data])
 
-    # train pred
-    train_pred = bst.predict(train_x).round()
-    logger.info(sum(train_pred == train_y) / len(train_y))
+    from scipy.stats import linregress
+    test_pred = bst.predict(test_x)
+    train_pred = bst.predict(train_x)
+    logger.info(singles_or_doubles)
+    logger.info(f'val set: {linregress(train_pred, train_y)}')
+    logger.info(f'val set: {linregress(test_pred, test_y)}')
 
-    test_pred = bst.predict(test_x).round()
-    logger.info(sum(test_pred == test_y) / len(test_y))
-
-    from scipy.stats import pearsonr, spearmanr
-    logger.info(pearsonr(test_pred, test_y))
-    import code; code.interact(local=dict(globals(), **locals()))
+    model_fn = f'/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/full-stepchart-model-{singles_or_doubles}.txt'
+    bst.save_model(model_fn)
+    logger.info(f'Saved model to {model_fn}')
     return bst
 
 
+def train_ridge(dataset: dict, singles_or_doubles: str, enps_l2_weight: float = 1):
+    # train/test split
+    sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
+    points = dataset['x'][sd_selector]
+    labels = dataset['y'][sd_selector]
+
+    # points = points[:, [0, 4, 8, 12]]
+    # points = points[:, [0, 1, 4, 5, 8, 9, 12, 13]]
+
+    points = np.copy(points)
+    points[:, :4] *= enps_l2_weight
+    from sklearn.linear_model import Ridge
+
+    train_x, test_x, train_y, test_y = train_test_split(
+        points, labels, test_size = 0.1, random_state = 0
+    )
+    
+    model = Ridge(positive = True)
+    model.fit(train_x, train_y)
+
+    from scipy.stats import linregress
+    test_pred = model.predict(test_x)
+    train_pred = model.predict(train_x)
+    logger.info(singles_or_doubles)
+    logger.info(f'val set: {linregress(train_pred, train_y)}')
+    logger.info(f'val set: {linregress(test_pred, test_y)}')
+
+    import code; code.interact(local=dict(globals(), **locals()))
+
+    return model
+
+
+def train_hist(dataset: dict, singles_or_doubles: str):
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    # train/test split
+    sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
+    points = dataset['x'][sd_selector]
+    labels = dataset['y'][sd_selector]
+
+    # points = points[:, [0, 4, 8, 12]]
+    # points = points[:, [0, 1, 4, 5, 8, 9, 12, 13]]
+
+    train_x, test_x, train_y, test_y = train_test_split(
+        points, labels, test_size = 0.1, random_state = 0
+    )
+    
+    model = HistGradientBoostingRegressor(monotonic_cst = [1] * points.shape[-1])
+    model.fit(train_x, train_y)
+
+    from scipy.stats import linregress
+    test_pred = model.predict(test_x)
+    train_pred = model.predict(train_x)
+    logger.info('hist')
+    logger.info(singles_or_doubles)
+    logger.info(f'val set: {linregress(train_pred, train_y)}')
+    logger.info(f'val set: {linregress(test_pred, test_y)}')
+
+    import pickle
+    model_fn = f'/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/full-stepchart-hist-{singles_or_doubles}.pkl'
+    with open(model_fn, 'wb') as f:
+        pickle.dump(model, f)
+    logger.info(f'Saved model to {model_fn}')
+
+    return model
+
 def main():
-    dataset = build_dataset()
+    """ Featurize full stepcharts and train difficulty prediction model.
+    """
+    dataset = build_full_stepchart_dataset()
 
-    bst = train_model(dataset)
-
+    for sd in ['singles', 'doubles']:
+        # bst = train_model(dataset, sd)
+        # model = train_ridge(dataset, sd, enps_l2_weight = 1)
+        model = train_hist(dataset, sd)
 
     logger.success('done')
     return
@@ -99,7 +171,7 @@ def main():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = """
-        Segments ChartStruct CSVs, updating metadata field
+        Trains difficulty prediction model on ChartStruct CSVs.
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 

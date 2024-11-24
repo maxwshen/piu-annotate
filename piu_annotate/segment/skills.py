@@ -326,9 +326,13 @@ def twists_over90(cs: ChartStruct) -> None:
     lines = cs.get_lines_with_active_holds()
     limb_annots = list(df['Limb annotation'])
 
-    res = [False]
+    list_is_over90_twist = [False]
+    list_is_close_twist = [False]
+    list_is_far_twist = [False]
     for i, j in itertools.pairwise(range(len(df))):
-        is_twist = False
+        is_over90_twist = False
+        is_close_twist = False
+        is_far_twist = False
         if 'r' in limb_annots[i] and 'l' in limb_annots[j]:
             leftmost_r_panel = notelines.get_leftmost_rightfoot_panel(
                 lines[i], limb_annots[i]
@@ -337,9 +341,9 @@ def twists_over90(cs: ChartStruct) -> None:
                 lines[j], limb_annots[j]
             )
             if leftmost_r_panel is not None and rightmost_l_panel is not None:
-                is_twist = any([
-                    notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
-                ])
+                is_over90_twist = notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
+                is_close_twist = notelines.is_close_twist(leftmost_r_panel, rightmost_l_panel)
+                is_far_twist = notelines.is_far_twist(leftmost_r_panel, rightmost_l_panel)
             
         if 'l' in limb_annots[i] and 'r' in limb_annots[j]:
             rightmost_l_panel = notelines.get_rightmost_leftfoot_panel(
@@ -349,13 +353,17 @@ def twists_over90(cs: ChartStruct) -> None:
                 lines[j], limb_annots[j]
             )
             if leftmost_r_panel is not None and rightmost_l_panel is not None:
-                is_twist = is_twist or any([
-                    notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
-                ])
+                is_over90_twist |= notelines.is_over90_twist(leftmost_r_panel, rightmost_l_panel)
+                is_close_twist |= notelines.is_close_twist(leftmost_r_panel, rightmost_l_panel)
+                is_far_twist |= notelines.is_far_twist(leftmost_r_panel, rightmost_l_panel)
 
-        res.append(is_twist)
+        list_is_over90_twist.append(is_over90_twist)
+        list_is_close_twist.append(is_close_twist)
+        list_is_far_twist.append(is_far_twist)
 
-    cs.df['__twist over90'] = res
+    cs.df['__twist over90'] = list_is_over90_twist
+    cs.df['__twist close'] = list_is_close_twist
+    cs.df['__twist far'] = list_is_far_twist
     return
 
 
