@@ -56,7 +56,7 @@ def build_crux_segment_dataset():
 
         sord = cs.singles_or_doubles()
         # model = lgb.Booster(model_file = args[f'full_stepchart_difficulty_model_{sord}'])
-        model_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/full-stepchart-hist-doubles.pkl'
+        model_fn = f'/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/full-stepchart-hist-{sord}.pkl'
         with open(model_fn, 'rb') as f:
             model = pickle.load(f)
 

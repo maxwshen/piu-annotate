@@ -77,7 +77,8 @@ def main():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = """
-        Evaluates models on chart structs with existing limb annotations
+        Checks PatternReasoner against manually annotated gold-standard limb annotations.
+        Used to find/debug violations, to try to improve PatternReasoner.
     """)
     parser.add_argument(
         '--chart_struct_csv', 
