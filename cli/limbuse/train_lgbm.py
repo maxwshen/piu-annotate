@@ -60,6 +60,14 @@ def create_dataset(
     csv_sord = [csv for csv in csvs
                 if guess_singles_or_doubles_from_filename(csv) in [singles_doubles, 'unsure']]
 
+    # if singles_doubles == 'doubles':
+    #     # limit n csvs to train on to prevent OOM killing
+    #     max_n_csvs = 460
+    #     if len(csv_sord) > max_n_csvs:
+    #         np.random.shuffle(csv_sord)
+    #         csv_sord = csv_sord[:max_n_csvs]
+    #         logger.info(f'Randomly subsetted training to {len(csv_sord)} to prevent OOM kill')
+
     all_points, all_labels = [], []
     n_csvs = 0
     for csv in tqdm(csv_sord):
@@ -68,9 +76,6 @@ def create_dataset(
             continue
 
         fcs = featurizers.ChartStructFeaturizer(cs)
-        # labels = fcs.get_labels_from_limb_col('Limb annotation')
-        # labels = fcs.get_label_matches_next('Limb annotation')
-        # labels = fcs.get_label_matches_prev('Limb annotation')
         labels = get_label_func(fcs)
 
         if use_limb_features:
@@ -118,7 +123,8 @@ def train_categorical_model(
         feature_name = feature_names,
         categorical_feature = [fn for fn in feature_names if fn.startswith('cat.')],
     )
-    params = {'objective': 'binary', 'metric': 'binary_logloss'}
+    # force_col_wise should decrease memory usage
+    params = {'objective': 'binary', 'metric': 'binary_logloss', 'force_col_wise': True}
     bst = lgb.train(params, train_data, valid_sets = [test_data])
 
     # train pred

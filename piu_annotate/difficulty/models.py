@@ -11,6 +11,8 @@ from loguru import logger
 from collections import defaultdict
 
 from sklearn.ensemble import HistGradientBoostingRegressor
+import lightgbm as lgb
+from lightgbm import Booster
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.difficulty import featurizers
@@ -37,13 +39,21 @@ class DifficultyModelPredictor:
     def load_models(self) -> None:
         logger.info(f'Loading difficulty models from {self.model_path}')
 
-        models: dict[str, HistGradientBoostingRegressor] = dict()
+        # models: dict[str, HistGradientBoostingRegressor] = dict()
+        # for sd in ['singles', 'doubles']:
+        #     for feature_subset in ['all', 'bracket', 'edp']:
+        #         name = f'{sd}-{feature_subset}'
+        #         logger.info(f'Loaded model: {name}')
+        #         with open(os.path.join(self.model_path, name + '.pkl'), 'rb') as f:
+        #             model: HistGradientBoostingRegressor = pickle.load(f)
+        #         models[name] = model
+        models: dict[str, Booster] = dict()
         for sd in ['singles', 'doubles']:
             for feature_subset in ['all', 'bracket', 'edp']:
                 name = f'{sd}-{feature_subset}'
                 logger.info(f'Loaded model: {name}')
-                with open(os.path.join(self.model_path, name + '.pkl'), 'rb') as f:
-                    model: HistGradientBoostingRegressor = pickle.load(f)
+                model_fn = os.path.join(self.model_path, f'lgbm-{name}.txt')
+                model = lgb.Booster(model_file = model_fn)
                 models[name] = model
         self.models = models
         return
@@ -86,12 +96,12 @@ class DifficultyModelPredictor:
         y_all = self.predict(xs, sord)
 
         # prediction only using bracket frequencies
-        # y_bracket = self.predict_skill_subset('bracket', xs, sord, ft_names)
+        y_bracket = self.predict_skill_subset('bracket', xs, sord, ft_names)
         # y_edp = self.predict_skill_subset('edp', xs, sord, ft_names)
 
         # adjust base prediction upward
         # predicted level tends to be low, as we featurize based on cruxes
-        pred = y_all * (1/.93)
+        pred = y_all * (1/.958)
 
         level = cs.get_chart_level()
         pred[(pred <= level + 1)] += 0.5
@@ -100,11 +110,12 @@ class DifficultyModelPredictor:
         # adjust prediction upwards.
         # Empirically, this helps because base prediction tends to place too little
         # importance on brackets.
-        # print(pred)
-        # idxs = (y_bracket > pred)
-        # w = 0.66
-        # pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
-        # print(pred)
+        print(pred)
+        print(y_bracket)
+        idxs = (y_bracket > pred)
+        w = 0.66
+        pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
+        print(pred)
 
         debug = args.setdefault('debug', False)
 
@@ -134,7 +145,8 @@ class DifficultyModelPredictor:
                     else:
                         # for multiple rare skills, or if segment is already predicted
                         # to be hard, lift difficulty beyond
-                        pred[i] += 0.5
+                        if pred[i] == level + 0.35:
+                            pred[i] += 0.5
                     rare_skill_dd[i].append(col)
 
         if debug:
