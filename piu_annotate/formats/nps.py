@@ -101,7 +101,6 @@ def calc_effective_downpress_times(
     for idx in range(len(cs.df)):
         time = times[idx]
         line = lines[idx]
-        print(idx)
         if not notelines.has_downpress(line):
              continue
         if idx == 0:

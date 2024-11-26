@@ -8,6 +8,7 @@ import pandas as pd
 import pickle
 from hackerargs import args
 from loguru import logger
+from collections import defaultdict
 
 from sklearn.ensemble import HistGradientBoostingRegressor
 
@@ -67,11 +68,13 @@ class DifficultyModelPredictor:
         x = x.reshape(1, -1)
         return self.predict(x, cs.singles_or_doubles())
 
-    def predict_segment_difficulties(self, cs: ChartStruct):
+    def predict_segment_difficulties(self, cs: ChartStruct) -> list[dict]:
         """ Predict difficulties of chart segments.
             Featurizes each segment separately, which amounts to calculating
             the highest frequency of skill events in varying-length time windows
             in segment.
+
+            Returns a list of dicts, one dict per segment.
         """
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
         fter = featurizers.DifficultyFeaturizer(cs)
@@ -83,7 +86,7 @@ class DifficultyModelPredictor:
         y_all = self.predict(xs, sord)
 
         # prediction only using bracket frequencies
-        y_bracket = self.predict_skill_subset('bracket', xs, sord, ft_names)
+        # y_bracket = self.predict_skill_subset('bracket', xs, sord, ft_names)
         # y_edp = self.predict_skill_subset('edp', xs, sord, ft_names)
 
         # adjust base prediction upward
@@ -97,14 +100,22 @@ class DifficultyModelPredictor:
         # adjust prediction upwards.
         # Empirically, this helps because base prediction tends to place too little
         # importance on brackets.
-        idxs = (y_bracket > pred)
-        w = 0.66
-        pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
+        # print(pred)
+        # idxs = (y_bracket > pred)
+        # w = 0.66
+        # pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
+        # print(pred)
+
+        debug = args.setdefault('debug', False)
 
         # rare skill
-        rare_skill_cands = ['edp-5', 'twistclose-5', 'twistfar-5', 'bracket-5', 'doublestep-5', 'jump-2', 'jack-2']
+        rare_skill_cands = ['twistclose-5', 'doublestep-5', 'jump-2', 'jack-2',
+                            'edp-5', 'bracket-5',
+                            ]
         train_data = self.dataset['x']
         train_levels = self.dataset['y']
+        # maps segment idx to list of rare skills
+        rare_skill_dd = defaultdict(list)
         for col in rare_skill_cands:
             ft_idx = ft_names.index(col)
             threshold = np.percentile(
@@ -113,7 +124,8 @@ class DifficultyModelPredictor:
             )
             rare_skill_idxs = xs[:, ft_idx] > threshold
             if rare_skill_idxs.any():
-                print(col, rare_skill_idxs)
+                if debug:
+                    print(col, rare_skill_idxs)
             
                 for i in np.where(rare_skill_idxs)[0]:
                     # set difficulty floor based on official stepchart level
@@ -123,8 +135,8 @@ class DifficultyModelPredictor:
                         # for multiple rare skills, or if segment is already predicted
                         # to be hard, lift difficulty beyond
                         pred[i] += 0.5
+                    rare_skill_dd[i].append(col)
 
-        debug = args.setdefault('debug', False)
         if debug:
             print(cs.metadata['shortname'])
             # print(y_all)
@@ -134,7 +146,15 @@ class DifficultyModelPredictor:
             print(pred)
             import code; code.interact(local=dict(globals(), **locals()))
 
-        return pred
+        segment_dicts = []
+        for i in range(len(sections)):
+            d = {
+                'level': np.round(pred[i], 2),
+                'rare skills': rare_skill_dd[i],
+            }
+            segment_dicts.append(d)
+
+        return segment_dicts
 
     def predict(self, xs: npt.NDArray, sord: str):
         model = self.models[f'{sord}-all']

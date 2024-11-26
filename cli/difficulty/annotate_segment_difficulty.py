@@ -32,7 +32,10 @@ def annotate_segment_difficulty():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/'
         chartstruct_files = [
+            'Mopemope_-_LeaF_D25_ARCADE.csv',
+            'GLORIA_-_Croire_D21_ARCADE.csv',
             'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv',
+            'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv',
             'Altale_-_sakuzyo_D19_ARCADE.csv',
             'Native_-_SHK_S20_ARCADE.csv',
             'Kimchi_Fingers_-_Garlic_Squad_D21_ARCADE.csv',
@@ -42,7 +45,6 @@ def annotate_segment_difficulty():
             'Super_Fantasy_-_SHK_S16_INFOBAR_TITLE_ARCADE.csv',
             'HTTP_-_Quree_S21_ARCADE.csv',
             'GOODBOUNCE_-_EBIMAYO_D21_ARCADE.csv',
-            'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv',
             'My_Dreams_-_Banya_Production_D22_ARCADE.csv',
             'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
             'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv',
@@ -59,12 +61,12 @@ def annotate_segment_difficulty():
         cs = ChartStruct.from_file(inp_fn)
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
 
-        preds = dmp.predict_segment_difficulties(cs)
+        segment_dicts = dmp.predict_segment_difficulties(cs)
 
         # update segment metadata dicts with level
         meta_dicts = [get_segment_metadata(cs, s) for s in sections]
-        for md, pred_level in zip(meta_dicts, list(preds)):
-            md['level'] = np.round(pred_level, 2)
+        for md, sd in zip(meta_dicts, segment_dicts):
+            md.update(sd)
         cs.metadata['Segment metadata'] = meta_dicts
 
         cs.to_csv(inp_fn)

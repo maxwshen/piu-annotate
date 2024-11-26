@@ -10,6 +10,8 @@ import functools
 import os
 import copy
 
+from scipy.stats import trim_mean
+
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.segment.skills import annotate_skills
 from piu_annotate.formats.nps import calc_effective_downpress_times
@@ -46,6 +48,51 @@ def calc_max_event_frequency(times: list[float], t: float) -> float:
     return max_frequency
 
 
+def smallest_positive_difference(
+    queries: npt.NDArray, 
+    refs: npt.NDArray, 
+    shift: bool = False
+):
+    """
+    Find the smallest positive difference between each query and the largest 
+    reference value less than the query.
+    
+    Parameters:
+    -----------
+    queries : numpy.ndarray
+        Input array of shape (n,)
+    refs : numpy.ndarray
+        Reference array of shape (m,)
+    shift : bool
+        If True, shift found indices left by 1 more. This is used to handle
+        staggered brackets.
+        
+    Returns:
+    --------
+    numpy.ndarray
+        Array of shape (n,) with smallest positive differences
+    """
+    # Sort the reference array
+    sorted_refs = np.sort(refs)
+    
+    # Find the indices of the largest values less than each query
+    # Using searchsorted for efficient lookup
+    indices = np.searchsorted(sorted_refs, queries, side='left') - 1
+
+    if shift:
+        indices -= 1
+
+    # Handle cases where no reference is less than the query
+    valid_mask = indices >= 0
+    
+    # Initialize result array
+    result = np.full_like(queries, np.nan, dtype=float)
+    
+    # Compute the differences for valid indices
+    result[valid_mask] = queries[valid_mask] - sorted_refs[indices[valid_mask]]
+    return result
+
+
 class DifficultyFeaturizer:
     def __init__(self, cs: ChartStruct, debug: bool = False):
         self.cs = cs
@@ -76,6 +123,10 @@ class DifficultyFeaturizer:
 
     def get_event_times(self) -> dict[str, npt.NDArray]:
         """ Get list of timestamps during which skills occur in stepchart/section.
+            
+            This effectively counts "how many" / "how frequent" a skill occurs,
+            but not "how fast". E.g. if brackets occur every few lines in a run,
+            the event time frequency is much lower than the run NPS.
         """
         times = self.times
         cs = self.cs
@@ -97,6 +148,59 @@ class DifficultyFeaturizer:
             event_times[k] = np.array([t for t in event_times[k]
                                        if t in self.original_edp_times])
         return event_times
+
+    def get_skill_nps_stats(
+        self, 
+        event_times: dict[str, npt.NDArray]
+    ) -> dict[str, npt.NDArray]:
+        """ Summarize statistics on `time_since` for lines with skills.
+            
+            This counts "how fast" a skill occurs.
+            E.g. if brackets occur every few lines in a run,
+            the bracket NPS will equal the run NPS.
+        """
+        times = self.times
+        cs = self.cs
+
+        # holds all edp times for full stepchart
+        all_edp_times = np.array(self.edp_times)
+
+        skills = {
+            'bracket': times[cs.df['__bracket']], 
+            'staggered_bracket': times[cs.df['__staggered bracket']],
+            'twist90': times[cs.df['__twist 90']],
+            'twistclose': times[cs.df['__twist close']],
+            'twistfar': times[cs.df['__twist far']],
+            'run': times[cs.df['__run']],
+            'drill': times[cs.df['__drill']],
+            'doublestep': times[cs.df['__doublestep']],
+            'jump': times[cs.df['__jump']],
+            'jack': times[cs.df['__jack']],
+            'footswitch': times[cs.df['__footswitch']],
+        }
+
+        skill_nps_stats = dict()
+        for skill, times in skills.items():
+            # calculate time since effective downpress
+            # staggered bracket times are on the second arrow of staggered bracket;
+            # to calculate time since effective downpress *before* staggered bracket,
+            # we use shift
+            if len(times) > 0:
+                time_since_edp = smallest_positive_difference(
+                    times, 
+                    all_edp_times,
+                    shift = bool(skill == 'staggered_bracket'),
+                )
+                nps_edp = 1 / time_since_edp
+                skill_nps_stats[f'{skill}-trimmedmean'] = trim_mean(nps_edp, 0.1)
+                skill_nps_stats[f'{skill}-median'] = np.median(nps_edp)
+                skill_nps_stats[f'{skill}-75thpct'] = np.percentile(nps_edp, 75)
+            else:
+                skill_nps_stats[f'{skill}-trimmedmean'] = 0
+                skill_nps_stats[f'{skill}-median'] = 0
+                skill_nps_stats[f'{skill}-75thpct'] = 0
+
+        return skill_nps_stats
 
     def get_feature_dict(self, section: Section | None = None) -> dict[str, float]:
         """ Returns dict of {feature name: value}.
@@ -132,6 +236,8 @@ class DifficultyFeaturizer:
                 feature_name = f'{event}-{t}'
                 fts[feature_name] = fq
 
+        skill_nps_stats = self.get_skill_nps_stats(event_times)
+        fts.update(skill_nps_stats)
         return fts
 
     def get_feature_names(self) -> list[str]:
@@ -153,7 +259,8 @@ class DifficultyFeaturizer:
 
 if __name__ == '__main__':
     folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/'
-    fn = folder + 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv'
+    # fn = folder + 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv'
+    fn = folder + 'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv'
     # fn = folder + 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv'
     cs = ChartStruct.from_file(fn)
     fter = DifficultyFeaturizer(cs)
