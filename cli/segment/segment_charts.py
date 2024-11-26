@@ -32,8 +32,14 @@ def main():
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
-    from collections import defaultdict
-    dd = defaultdict(list)
+    debug = args.setdefault('debug', False)
+    if debug:
+        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/'
+        chartstruct_files = [
+            'The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
+        ]
+        chartstruct_files = [folder + f for f in chartstruct_files]
+
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         try:
@@ -42,10 +48,10 @@ def main():
             logger.error(f'Failed to load {inp_fn}')
             sys.exit()
 
-        sections = segmentation(cs)
+        sections = segmentation(cs, debug = debug)
         cs.metadata['Segments'] = [s.to_tuple() for s in sections]
         cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
-        cs.to_csv(inp_fn)
+        # cs.to_csv(inp_fn)
 
     logger.success('done')
     return

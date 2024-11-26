@@ -156,13 +156,19 @@ class Segmenter:
         sections = [Section(i, j, self.times[i], self.times[j])
                     for i, j in itertools.pairwise(best_segments)]
 
-        # try splitting long sections
-        new_sections = []
-        for section in sections:
-            if section.time_length() >= 24:
-                new_sections += self.split(section)
+        # try splitting long sections, repeat until convergence
+        while True:
+            new_sections = []
+            for section in sections:
+                if section.time_length() >= 24:
+                    new_sections += self.split(section)
+                else:
+                    new_sections.append(section)
+            
+            if new_sections != sections:
+                sections = new_sections
             else:
-                new_sections.append(section)
+                break
 
         if self.debug:
             print(self.cs.df['Time'].iloc[best_segments[:-1]])

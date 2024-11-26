@@ -32,6 +32,7 @@ def annotate_segment_difficulty():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/'
         chartstruct_files = [
+            'Super_Fantasy_-_SHK_S16_INFOBAR_TITLE_ARCADE.csv',
             'HTTP_-_Quree_S21_ARCADE.csv',
             'GOODBOUNCE_-_EBIMAYO_D21_ARCADE.csv',
             'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv',
