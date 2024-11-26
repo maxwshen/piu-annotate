@@ -411,6 +411,31 @@ class Tactician:
             logger.debug(f'Changed {n_edits} arrows after line with one hold release')
         return pred_limbs
 
+    def remove_unforced_brackets(self, pred_limbs: NDArray) -> NDArray:
+        """ For low-level charts, replace unforced brackets with jumps
+        """
+        n_lines_fixed = 0
+        pred_limbs = pred_limbs.copy()        
+        lines = [l.replace('`', '') for l in self.cs.df['Line with active holds']]
+        for row_idx, pc_idxs in self.row_idx_to_pcs.items():
+            # consider lines with exactly 2 downpresses
+            if len(pc_idxs) == 2:
+                pcs = [self.pred_coords[i] for i in pc_idxs]
+                limbs = pred_limbs[pc_idxs]
+                line = lines[row_idx]
+
+                if len(set(limbs)) == 1 and notelines.line_is_bracketable(line):
+                    # line with exactly 2 downpresses has been bracketed
+
+                    # do not use scoring, just enforce left foot on "left" panel
+                    best_combo = [0, 1]
+                    for limb, pc_idx in zip(best_combo, pc_idxs):
+                        pred_limbs[pc_idx] = limb
+                    n_lines_fixed += 1
+        if self.verbose and n_lines_fixed > 0:
+            logger.debug(f'Fixed {n_lines_fixed} unforced brackets')
+        return pred_limbs
+
     def beam_search(
         self, 
         pred_limbs: NDArray, 

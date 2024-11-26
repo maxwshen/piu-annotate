@@ -89,4 +89,10 @@ def predict(
         logger.info(f'Score, fix impossible lines with holds: {tactics.score(pred_limbs):.3f}')
         fcs.evaluate(pred_limbs, verbose = True)
 
+    if cs.get_chart_level() <= 15:
+        pred_limbs = tactics.remove_unforced_brackets(pred_limbs)
+        if verbose:
+            logger.info(f'Score, fix low-level unforced brackets: {tactics.score(pred_limbs):.3f}')
+            fcs.evaluate(pred_limbs, verbose = True)
+
     return cs, fcs, pred_limbs
