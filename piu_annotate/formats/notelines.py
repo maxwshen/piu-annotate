@@ -44,6 +44,11 @@ def get_downpress_limbs(line_with_active_holds: str, limb_annot: str) -> set[str
     return set(dp_limbs)
 
 
+def get_downpress_arrows(line: str) -> list[int]:
+    line = line.replace('`', '')
+    return [i for i, s in enumerate(line) if s in '12']
+
+
 def get_leftmost_rightfoot_panel(line_with_active_holds: str, limb_annot: str) -> int | None:
     """ Returns index of left-most panel used by right foot for 1/2/4.
         Returns None if right foot is not used for 1/2/4.

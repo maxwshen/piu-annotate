@@ -13,7 +13,7 @@ from piu_annotate.formats import notelines
 # used to filter short runs
 # for example, if a run is shorter than 8 notes, do not label as run
 MIN_DRILL_LEN = 5
-MIN_RUN_LEN = 8
+MIN_RUN_LEN = 7
 MIN_ANCHOR_RUN_LEN = 7
 
 # used for side3 singles, mid4 doubles, etc.
@@ -132,8 +132,7 @@ def run(cs: ChartStruct) -> None:
             math.isclose(ts[i], ts[j])
         ]
         if all(crits):
-            idxs.add(i-1)
-            idxs.add(i)
+            idxs.add(j)
 
     cs.df['__run'] = filter_short_runs(idxs, len(df), MIN_RUN_LEN)  
     return
@@ -235,22 +234,42 @@ def staggered_brackets(cs: ChartStruct) -> None:
 
 
 def doublestep(cs: ChartStruct) -> None:
+    """ Doublestep should be detected in 86 during active holds,
+        and in End of the World D22 with hold release between double steps.
+    """
     df = cs.df
     lines = cs.get_lines()
+    line_ahs = cs.get_lines_with_active_holds()
     limb_annots = list(df['Limb annotation'])
     staggered_brackets = list(df['__staggered bracket'])
     jacks = list(df['__jack'])
 
+    prev_dp_limbs = notelines.get_downpress_limbs(line_ahs[0], limb_annots[0])
+    prev_dp_arrows = notelines.get_downpress_arrows(line_ahs[0])
     res = [False]
-    for i, j in itertools.pairwise(range(len(df))):
-        crits = [
-            notelines.has_one_1(lines[i]),
-            notelines.has_one_1(lines[j]),
-            limb_annots[i] == limb_annots[j],
-            not staggered_brackets[j],
-            not jacks[j],
-        ]
-        res.append(all(crits))
+    for i in range(1, len(df)):
+        dp_limbs = notelines.get_downpress_limbs(line_ahs[i], limb_annots[i])
+        dp_arrows = notelines.get_downpress_arrows(line_ahs[i])
+
+        is_doublestep = False
+        if len(dp_limbs) == 1:
+            # check if limb is in previous downpress limbs --
+            # this means that 10001 -> 00100 considered downpress
+            limb = list(dp_limbs)[0]
+            crits = [
+                limb in prev_dp_limbs,
+                dp_arrows != prev_dp_arrows,
+                not jacks[i],
+                not staggered_brackets[i],
+            ]
+            is_doublestep = all(crits)
+
+        # has doublestep, so update prev dp limbs
+        if len(dp_limbs) > 0:
+            prev_dp_limbs = dp_limbs
+            prev_dp_arrows = dp_arrows
+
+        res.append(is_doublestep)
 
     cs.df['__doublestep'] = res
     return

@@ -61,6 +61,12 @@ class DifficultyModelPredictor:
         dist_to_closest = np.linalg.norm(train_data[closest_idxs] - xs, axis = 1)
         return dist_to_closest
 
+    def predict_stepchart(self, cs: ChartStruct):
+        fter = featurizers.DifficultyFeaturizer(cs)
+        x = fter.featurize_full_stepchart()
+        x = x.reshape(1, -1)
+        return self.predict(x, cs.singles_or_doubles())
+
     def predict_segment_difficulties(self, cs: ChartStruct):
         """ Predict difficulties of chart segments.
             Featurizes each segment separately, which amounts to calculating
@@ -82,7 +88,7 @@ class DifficultyModelPredictor:
 
         # adjust base prediction upward
         # predicted level tends to be low, as we featurize based on cruxes
-        pred = y_all * (1/.95)
+        pred = y_all * (1/.93)
 
         level = cs.get_chart_level()
         pred[(pred <= level + 1)] += 0.5
@@ -96,16 +102,27 @@ class DifficultyModelPredictor:
         pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
 
         # rare skill
-        rare_skill_cands = ['bracket-5', 'doublestep-5',
-                            'jump-5', 'jack-5', 'footswitch-5']
+        rare_skill_cands = ['edp-5', 'twistclose-5', 'twistfar-5', 'bracket-5', 'doublestep-5', 'jump-2', 'jack-2']
         train_data = self.dataset['x']
+        train_levels = self.dataset['y']
         for col in rare_skill_cands:
             ft_idx = ft_names.index(col)
-            xs[:, ft_idx]
-            threshold = np.percentile(train_data[:, ft_idx], 97)
-            segments = xs[:, ft_idx] > threshold
-            if segments.any():
-                print(col, segments)
+            threshold = np.percentile(
+                train_data[train_levels <= level, ft_idx], 
+                96
+            )
+            rare_skill_idxs = xs[:, ft_idx] > threshold
+            if rare_skill_idxs.any():
+                print(col, rare_skill_idxs)
+            
+                for i in np.where(rare_skill_idxs)[0]:
+                    # set difficulty floor based on official stepchart level
+                    if pred[i] < level + 0.35:
+                        pred[i] = level + 0.35
+                    else:
+                        # for multiple rare skills, or if segment is already predicted
+                        # to be hard, lift difficulty beyond
+                        pred[i] += 0.5
 
         debug = args.setdefault('debug', False)
         if debug:

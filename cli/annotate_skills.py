@@ -59,7 +59,8 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--csv',
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/BOOOM!!_-_RiraN_D22_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/My_Dreams_-_Banya_Production_D22_ARCADE.csv',
     )

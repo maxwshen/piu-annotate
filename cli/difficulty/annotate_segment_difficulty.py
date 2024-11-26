@@ -32,19 +32,21 @@ def annotate_segment_difficulty():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/'
         chartstruct_files = [
+            'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv',
+            'Altale_-_sakuzyo_D19_ARCADE.csv',
             'Native_-_SHK_S20_ARCADE.csv',
             'Kimchi_Fingers_-_Garlic_Squad_D21_ARCADE.csv',
-            # 'Life_is_PIANO_-_Junk_D21_ARCADE.csv',
-            # '8_6_-_DASU_D21_ARCADE.csv',
-            # 'The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
-            # 'Super_Fantasy_-_SHK_S16_INFOBAR_TITLE_ARCADE.csv',
-            # 'HTTP_-_Quree_S21_ARCADE.csv',
-            # 'GOODBOUNCE_-_EBIMAYO_D21_ARCADE.csv',
-            # 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv',
-            # 'My_Dreams_-_Banya_Production_D22_ARCADE.csv',
-            # 'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
-            # 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv',
-            # 'BOOOM!!_-_RiraN_D22_ARCADE.csv'
+            'Life_is_PIANO_-_Junk_D21_ARCADE.csv',
+            '8_6_-_DASU_D21_ARCADE.csv',
+            'The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
+            'Super_Fantasy_-_SHK_S16_INFOBAR_TITLE_ARCADE.csv',
+            'HTTP_-_Quree_S21_ARCADE.csv',
+            'GOODBOUNCE_-_EBIMAYO_D21_ARCADE.csv',
+            'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv',
+            'My_Dreams_-_Banya_Production_D22_ARCADE.csv',
+            'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
+            'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv',
+            'BOOOM!!_-_RiraN_D22_ARCADE.csv'
         ]
         chartstruct_files = [folder + f for f in chartstruct_files]
 
