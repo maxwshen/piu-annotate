@@ -110,12 +110,12 @@ class DifficultyModelPredictor:
         # adjust prediction upwards.
         # Empirically, this helps because base prediction tends to place too little
         # importance on brackets.
-        print(pred)
-        print(y_bracket)
+        # print(pred)
+        # print(y_bracket)
         idxs = (y_bracket > pred)
         w = 0.66
         pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
-        print(pred)
+        # print(pred)
 
         debug = args.setdefault('debug', False)
 
@@ -151,8 +151,8 @@ class DifficultyModelPredictor:
 
         if debug:
             print(cs.metadata['shortname'])
-            # print(y_all)
-            # print(y_bracket)
+            print(y_all)
+            print(y_bracket)
             # print(y_edp)
             # print(y_all * (1/.95) + 1)
             print(pred)

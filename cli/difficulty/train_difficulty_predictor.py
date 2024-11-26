@@ -186,15 +186,15 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424',
     )
     parser.add_argument(
         '--csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Nyarlathotep_-_nato_S21_ARCADE.csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/BOOOM!!_-_RiraN_D22_ARCADE.csv',
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/My_Dreams_-_Banya_Production_D22_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/Nyarlathotep_-_nato_S21_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/BOOOM!!_-_RiraN_D22_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/My_Dreams_-_Banya_Production_D22_ARCADE.csv',
     )
     args.parse_args(parser)
     main()

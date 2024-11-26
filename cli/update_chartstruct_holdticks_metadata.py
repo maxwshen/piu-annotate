@@ -29,11 +29,11 @@ def main():
             sys.exit()
 
         # update hold tick counts
-        # source_ssc = cs.metadata['ssc_file']
-        # desc_songtype = cs.metadata['DESCRIPTION'] + '_' + cs.metadata['SONGTYPE']
-        # stepchart_ssc = StepchartSSC.from_song_ssc_file(source_ssc, desc_songtype)
-        # _, holdticks, msg = stepchart_ssc_to_chartstruct(stepchart_ssc)
-        # cs.metadata['Hold ticks'] = holdticks
+        source_ssc = cs.metadata['ssc_file']
+        desc_songtype = cs.metadata['DESCRIPTION'] + '_' + cs.metadata['SONGTYPE']
+        stepchart_ssc = StepchartSSC.from_song_ssc_file(source_ssc, desc_songtype)
+        _, holdticks, msg = stepchart_ssc_to_chartstruct(stepchart_ssc)
+        cs.metadata['Hold ticks'] = holdticks
 
         # annotate effective nps
         enps_annots = annotate_enps(cs)

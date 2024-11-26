@@ -49,7 +49,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/',
     )
     args.parse_args(parser)
     main()
