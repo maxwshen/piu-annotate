@@ -92,18 +92,28 @@ def calc_effective_downpress_times(
     line_ahs = [l.replace('`', '') for l in cs.df['Line with active holds']]
     lines = [l.replace('`', '') for l in cs.df['Line']]
     times = list(cs.df['Time'])
+    limb_annots = list(cs.df['Limb annotation'])
     repeats_prev_dp_idx = list(cs.df['__line repeats previous downpress line'])
     time_since_prev_dp = list(cs.df['__time since prev downpress'])
 
     edp_times = []
+    prev_hold_releases = dict()
     for idx in range(len(cs.df)):
         time = times[idx]
-        line = lines[idx].replace('`', '')
+        line = lines[idx]
+        print(idx)
         if not notelines.has_downpress(line):
              continue
         if idx == 0:
             edp_times.append(time)
         else:
+            # track time of hold releases
+            panel_to_action = notelines.panel_idx_to_action(line)
+            for panel, action in panel_to_action.items():
+                if action == '3':
+                    limb = notelines.get_limb_for_arrow_pos(line_ahs[idx], limb_annots[idx], panel)
+                    prev_hold_releases[panel] = (time, limb)
+
             if notelines.is_hold_start(line):
                 crits = [
                     repeats_prev_dp_idx[idx],
@@ -124,6 +134,25 @@ def calc_effective_downpress_times(
                     if times[idx] - times[idx - 1] < 0.05:
                         continue
             
+            if '1' not in line and '2' in line:
+                # ok if 3 is in line too
+                # if line only starts holds, and all hold starts
+                # are on panels that were recently hold released, 
+                # then not effective downpress
+                hold_start_idxs = [i for i, s in enumerate(line) if s == '2']
+                oks = [False] * len(hold_start_idxs)
+                for pi, p in enumerate(hold_start_idxs):
+                    curr_limb = notelines.get_limb_for_arrow_pos(line_ahs[idx], limb_annots[idx], p)
+                    if p in prev_hold_releases:
+                        prev_time, prev_limb = prev_hold_releases[p]
+                        crits = [
+                            prev_limb == curr_limb,
+                            time - prev_time < 0.2,
+                        ]
+                        oks[pi] = all(crits)
+                if all(oks):
+                    continue
+
             if time < edp_times[-1] + 0.005:
                 # ignore notes very close together (faster than 200 nps);
                 # these are ssc artifacts
