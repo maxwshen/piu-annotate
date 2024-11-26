@@ -8,6 +8,7 @@ from loguru import logger
 from hackerargs import args
 import functools
 import os
+import copy
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.segment.skills import annotate_skills
@@ -40,9 +41,6 @@ def calc_max_event_frequency(times: list[float], t: float) -> float:
         # Calculate frequency in current window
         events_in_window = right - left + 1
         frequency = events_in_window / t
-        # window_size = min(t, times[right] - times[left] if left < right else t)
-        # frequency = events_in_window / window_size
-        
         max_frequency = max(max_frequency, frequency)
 
     return max_frequency
@@ -54,10 +52,13 @@ class DifficultyFeaturizer:
         cs.annotate_time_since_downpress()
         cs.annotate_num_downpresses()
         annotate_skills(cs)
-        self.window_times = [5, 10, 30, 45]
+        self.window_times = [2, 5, 7]
+        # self.window_times = [5, 10, 30, 45]
 
         self.times = np.array(cs.df['Time'])
-        self.edp_times = calc_effective_downpress_times(cs)
+        self.original_edp_times = calc_effective_downpress_times(cs)
+        self.edp_times = copy.copy(self.original_edp_times)
+
         # remove staggered bracket downpresses
         for sbt in self.times[cs.df['__staggered bracket']]:
             if sbt in self.edp_times:
@@ -68,6 +69,8 @@ class DifficultyFeaturizer:
         ]))
 
     def get_event_times(self) -> dict[str, npt.NDArray]:
+        """ Get list of timestamps during which skills occur in stepchart/section.
+        """
         times = self.times
         cs = self.cs
         event_times = {
@@ -83,53 +86,75 @@ class DifficultyFeaturizer:
             'jack': times[cs.df['__jack']],
             'footswitch': times[cs.df['__footswitch']],
         }
+        # reduce to event times for effective downpresses
+        for k in event_times:
+            event_times[k] = np.array([t for t in event_times[k]
+                                       if t in self.original_edp_times])
         return event_times
 
-    def featurize_full_stepchart(self) -> npt.NDArray:
+    def get_feature_dict(self, section: Section | None = None) -> dict[str, float]:
+        """ Returns dict of {feature name: value}.
+
+            If section is provided, then trims event times to section.
+            For window sizes longer than section length, expand max event frequency
+            with discount factor to "repeat" the section to fill up the window.
+        """
         event_times = self.get_event_times()
+
+        if section:
+            filt_times = lambda ts: ts[(ts >= section.start_time) & (ts < section.end_time)]
+            # trim event times to specific section
+            for k in event_times:
+                event_times[k] = filt_times(event_times[k])
+
         fts = dict()
         for event, ts in event_times.items():
             for t in self.window_times:
-                fts[f'{event}-{t}'] = calc_max_event_frequency(ts, t)
+                fq = calc_max_event_frequency(ts, t)
+
+                if section:
+                    # if section is shorter than time window,
+                    # extrapolate by simulating if section was repeated,
+                    # but with discount factor
+                    sec_len = section.time_length()
+                    if sec_len < t:
+                        ratio = t / sec_len
+                        # fq *= ratio
+                        adj = 0.75
+                        fq *= ratio * adj
+
+                feature_name = f'{event}-{t}'
+                fts[feature_name] = fq
+
+        return fts
+
+    def get_feature_names(self) -> list[str]:
+        return list(self.get_feature_dict().keys())
+
+    def featurize_full_stepchart(self) -> npt.NDArray:
+        fts = self.get_feature_dict()
         x = np.array(list(fts.values()))
         return x
 
     def featurize_sections(self, sections: list[Section]) -> npt.NDArray:
         all_x = []
-        for sec in sections:
-            filt_times = lambda ts: ts[(ts >= sec.start_time) & (ts <= sec.end_time)]
-
-            event_times = self.get_event_times()
-            # trim event times to specific section
-            for k in event_times:
-                event_times[k] = filt_times(event_times[k])
-
-            fts = dict()
-            for event, ts in event_times.items():
-                for t in self.window_times:
-                    fq = calc_max_event_frequency(ts, t)
-
-                    # if section is shorter than time window,
-                    # extrapolate by simulating if section was repeated,
-                    # but with discount factor
-                    sec_len = sec.time_length()
-                    if sec_len < t:
-                        ratio = t / sec_len
-                        # fq *= ratio
-                        adj = max(1, 1 - (np.log(ratio * 0.5) / np.e))
-                        fq *= ratio * adj
-                    fts[f'{event}-{t}'] = fq
-            
+        for section in sections:
+            fts = self.get_feature_dict(section = section)            
             x = np.array(list(fts.values()))
             all_x.append(x)
-
         return np.stack(all_x)
 
 
-
 if __name__ == '__main__':
-    fn = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/VVV_-_ZiGZaG_S18_ARCADE.csv'
+    folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/'
+    fn = folder + 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv'
+    # fn = folder + 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv'
     cs = ChartStruct.from_file(fn)
+    fter = DifficultyFeaturizer(cs)
+    fter.featurize_full_stepchart()
 
-    # featurize(cs, debug = True)
+    sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+    xs = fter.featurize_sections(sections)
+    print(xs)
+    import code; code.interact(local=dict(globals(), **locals()))
 

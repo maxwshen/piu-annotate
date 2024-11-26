@@ -20,6 +20,7 @@ from piu_annotate.segment.skills import annotate_skills
 
 @dataclass
 class Section:
+    """ start, end are inclusive """
     start: int
     end: int
     start_time: float

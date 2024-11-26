@@ -135,8 +135,20 @@ def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
             bpm, notetype = calc_bpm(time_since[i], display_bpm)
             nps = 1 / time_since[i]
             annot = f'{nps:.1f} nps\n{notetype}\n{round(bpm) }bpm'
-            if not annots or annot != annots[-1]:
+
+            # avoid adding new annotation if it's identical to the most recent one,
+            # unless enough time has passed
+            if not annots:
                 annots.append(annot)
                 annot_times.append(edp_times[i])
+            else:
+                if annot != annots[-1]:
+                    annots.append(annot)
+                    annot_times.append(edp_times[i])
+                else:
+                    # same annotation, but enough time has passed
+                    if edp_times[i] >= annot_times[-1] + 5:
+                        annots.append(annot)
+                        annot_times.append(edp_times[i])
 
     return list(zip(annot_times, annots))

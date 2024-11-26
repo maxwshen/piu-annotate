@@ -36,7 +36,7 @@ def get_segment_metadata(cs: ChartStruct, section: Section) -> dict[str, any]:
     enps = n_edps / section.time_length()
 
     metadata = {
-        'eNPS': enps,
+        'eNPS': np.round(enps, 1),
     }
     return metadata
 

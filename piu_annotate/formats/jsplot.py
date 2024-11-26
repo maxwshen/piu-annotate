@@ -118,6 +118,11 @@ class ChartJsStruct:
             metadata = {}
         return ChartJsStruct(arrow_arts, hold_arts, metadata)
 
+    def update_metadata(self, cs: ChartStruct) -> None:
+        self.metadata = cs.metadata
+        self.json_struct = self.get_json_struct()
+        return
+
     def get_json_struct(self):
         """ Get representation in terms of lists and basic objects.
             Returns a tuple, containing:

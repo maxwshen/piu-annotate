@@ -21,20 +21,34 @@ def main():
         os.makedirs(out_dir)
     logger.info(f'Writing to {out_dir=}')
 
+    rerun_all = args.setdefault('rerun_all', False)
+    update_metadata_only = args.setdefault('update_metadata_only', False)
+    assert not rerun_all or not update_metadata_only, 'only one can be true'
+
     for csv in tqdm(csvs):
         basename = make_basename_url_safe(os.path.basename(csv).replace('.csv', '.json'))
         out_fn = os.path.join(out_dir, basename)
 
-        if os.path.isfile(out_fn) and not args.setdefault('rerun', False):
-            continue
-
-        cs = ChartStruct.from_file(csv)
-        try:
-            cjs = ChartJsStruct.from_chartstruct(cs)
+        if update_metadata_only:
+            if not os.path.isfile(out_fn):
+                logger.error(f'Attempted to update metadata only, but {out_fn} does not exist. Do a fresh run first')
+            cjs = ChartJsStruct.from_json(out_fn)
+            cs = ChartStruct.from_file(csv)
+            cjs.update_metadata(cs)
             cjs.to_json(out_fn)
-        except Exception as e:
-            logger.error(str(e))
-            logger.error(csv)
+
+        else:
+            # fresh run: can rerun all, or skip finished files
+            if os.path.isfile(out_fn) and not rerun_all:
+                continue
+
+            cs = ChartStruct.from_file(csv)
+            try:
+                cjs = ChartJsStruct.from_chartstruct(cs)
+                cjs.to_json(out_fn)
+            except Exception as e:
+                logger.error(str(e))
+                logger.error(csv)
 
     logger.success(f'Done.')
     return

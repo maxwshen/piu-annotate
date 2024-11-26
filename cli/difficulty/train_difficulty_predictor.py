@@ -50,8 +50,13 @@ def build_full_stepchart_dataset():
         files.append(cs_file)
         singles_or_doubles.append(cs.singles_or_doubles())
 
-    dataset = {'x': np.array(X), 'y': np.array(Y),
-               'files': files, 'singles_or_doubles': singles_or_doubles}
+    dataset = {
+        'x': np.array(X), 
+        'y': np.array(Y),
+        'files': files, 
+        'singles_or_doubles': singles_or_doubles,
+        'feature_names': fter.get_feature_names()
+    }
 
     with open(dataset_fn, 'wb') as f:
         pickle.dump(dataset, f)
@@ -59,81 +64,28 @@ def build_full_stepchart_dataset():
     return dataset
 
 
-def train_model(dataset: dict, singles_or_doubles: str):
-    # train/test split
-    sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
-    points = dataset['x'][sd_selector]
-    labels = dataset['y'][sd_selector]
-
-    # points = points[:, [0, 4, 8, 12]]
-    # points = points[:, [0, 1, 4, 5, 8, 9, 12, 13]]
-
-    train_x, test_x, train_y, test_y = train_test_split(
-        points, labels, test_size = 0.1, random_state = 0
-    )
-    
-    train_data = lgb.Dataset(train_x, label = train_y)
-    test_data = lgb.Dataset(test_x, label = test_y)
-    params = {'objective': 'regression'}
-    bst = lgb.train(params, train_data, valid_sets = [test_data])
-
-    from scipy.stats import linregress
-    test_pred = bst.predict(test_x)
-    train_pred = bst.predict(train_x)
-    logger.info(singles_or_doubles)
-    logger.info(f'val set: {linregress(train_pred, train_y)}')
-    logger.info(f'val set: {linregress(test_pred, test_y)}')
-
-    model_fn = f'/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/full-stepchart-model-{singles_or_doubles}.txt'
-    bst.save_model(model_fn)
-    logger.info(f'Saved model to {model_fn}')
-    return bst
-
-
-def train_ridge(dataset: dict, singles_or_doubles: str, enps_l2_weight: float = 1):
-    # train/test split
-    sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
-    points = dataset['x'][sd_selector]
-    labels = dataset['y'][sd_selector]
-
-    # points = points[:, [0, 4, 8, 12]]
-    # points = points[:, [0, 1, 4, 5, 8, 9, 12, 13]]
-
-    points = np.copy(points)
-    points[:, :4] *= enps_l2_weight
-    from sklearn.linear_model import Ridge
-
-    train_x, test_x, train_y, test_y = train_test_split(
-        points, labels, test_size = 0.1, random_state = 0
-    )
-    
-    model = Ridge(positive = True)
-    model.fit(train_x, train_y)
-
-    from scipy.stats import linregress
-    test_pred = model.predict(test_x)
-    train_pred = model.predict(train_x)
-    logger.info(singles_or_doubles)
-    logger.info(f'val set: {linregress(train_pred, train_y)}')
-    logger.info(f'val set: {linregress(test_pred, test_y)}')
-
-    import code; code.interact(local=dict(globals(), **locals()))
-
-    return model
-
-
-def train_hist(dataset: dict, singles_or_doubles: str):
+def train_hist(
+    dataset: dict, 
+    singles_or_doubles: str,
+    feature_subset: str = 'all',
+):
+    """ Trains a monotonic HistGradientBoostingRegressor
+        to predict stepchart difficulty
+    """
     from sklearn.ensemble import HistGradientBoostingRegressor
     # train/test split
     sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
     points = dataset['x'][sd_selector]
     labels = dataset['y'][sd_selector]
+    feature_names = dataset['feature_names']
 
-    # points = points[:, [0, 4, 8, 12]]
-    # points = points[:, [0, 1, 4, 5, 8, 9, 12, 13]]
+    if feature_subset != 'all':
+        ok_idxs = [i for i, nm in enumerate(feature_names) if feature_subset in nm]
+        logger.info(f'Using {feature_subset=} with {len(ok_idxs)} features ...')
+        points = points[:, ok_idxs]
 
     train_x, test_x, train_y, test_y = train_test_split(
-        points, labels, test_size = 0.1, random_state = 0
+        points, labels, test_size = 0.05, random_state = 0
     )
     
     model = HistGradientBoostingRegressor(monotonic_cst = [1] * points.shape[-1])
@@ -144,16 +96,18 @@ def train_hist(dataset: dict, singles_or_doubles: str):
     train_pred = model.predict(train_x)
     logger.info('hist')
     logger.info(singles_or_doubles)
-    logger.info(f'val set: {linregress(train_pred, train_y)}')
+    logger.info(f'train set: {linregress(train_pred, train_y)}')
     logger.info(f'val set: {linregress(test_pred, test_y)}')
 
     import pickle
-    model_fn = f'/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/full-stepchart-hist-{singles_or_doubles}.pkl'
+    model_dir = '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/'
+    model_fn = os.path.join(model_dir, f'{singles_or_doubles}-{feature_subset}.pkl')
     with open(model_fn, 'wb') as f:
         pickle.dump(model, f)
     logger.info(f'Saved model to {model_fn}')
 
-    return model
+    return
+
 
 def main():
     """ Featurize full stepcharts and train difficulty prediction model.
@@ -161,9 +115,8 @@ def main():
     dataset = build_full_stepchart_dataset()
 
     for sd in ['singles', 'doubles']:
-        # bst = train_model(dataset, sd)
-        # model = train_ridge(dataset, sd, enps_l2_weight = 1)
-        model = train_hist(dataset, sd)
+        for feature_subset in ['all', 'bracket', 'edp']:
+            train_hist(dataset, sd, feature_subset = feature_subset)
 
     logger.success('done')
     return

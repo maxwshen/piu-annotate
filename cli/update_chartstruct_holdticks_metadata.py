@@ -29,13 +29,13 @@ def main():
             sys.exit()
 
         # update hold tick counts
-        source_ssc = cs.metadata['ssc_file']
-        desc_songtype = cs.metadata['DESCRIPTION'] + '_' + cs.metadata['SONGTYPE']
-        stepchart_ssc = StepchartSSC.from_song_ssc_file(source_ssc, desc_songtype)
-        _, holdticks, msg = stepchart_ssc_to_chartstruct(stepchart_ssc)
-        cs.metadata['Hold ticks'] = holdticks
+        # source_ssc = cs.metadata['ssc_file']
+        # desc_songtype = cs.metadata['DESCRIPTION'] + '_' + cs.metadata['SONGTYPE']
+        # stepchart_ssc = StepchartSSC.from_song_ssc_file(source_ssc, desc_songtype)
+        # _, holdticks, msg = stepchart_ssc_to_chartstruct(stepchart_ssc)
+        # cs.metadata['Hold ticks'] = holdticks
 
-        # # annotate effective nps
+        # annotate effective nps
         enps_annots = annotate_enps(cs)
         cs.metadata['eNPS annotations'] = enps_annots
 
@@ -61,8 +61,8 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/',
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424',
     )
     args.parse_args(parser)
     main()
