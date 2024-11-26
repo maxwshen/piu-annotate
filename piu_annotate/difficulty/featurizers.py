@@ -56,7 +56,13 @@ class DifficultyFeaturizer:
         # self.window_times = [5, 10, 30, 45]
 
         self.times = np.array(cs.df['Time'])
-        self.original_edp_times = calc_effective_downpress_times(cs)
+        # do not adjust for staggered brackets yet in "original"
+        # this ensures that we do not remove staggered brackets when filtering
+        # events to timestamps with effective downpresses
+        self.original_edp_times = calc_effective_downpress_times(
+            cs, 
+            adjust_for_staggered_brackets = False
+        )
         self.edp_times = copy.copy(self.original_edp_times)
 
         # remove staggered bracket downpresses

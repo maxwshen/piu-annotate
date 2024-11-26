@@ -8,6 +8,7 @@ import functools
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import notelines
+from piu_annotate.segment import skills
 
 # under this threshold, do not count hold as effective downpress. unit = seconds
 HOLD_TIME_THRESHOLD = 0.3
@@ -67,16 +68,37 @@ def calc_bpm(time_since: float, display_bpm: float | None) -> tuple[float, str]:
 
 
 @functools.lru_cache
-def calc_effective_downpress_times(cs: ChartStruct) -> list[float]:
+def calc_effective_downpress_times(
+    cs: ChartStruct,
+    adjust_for_staggered_brackets: bool = True,
+) -> list[float]:
     """ Calculate times of effective downpresses.
         An effective downpress is 1 or 2, where we do not count lines
         with only hold starts if they repeat the previous line, and occur
         soon after the previous line.
+
+        Examples:
+            1 -> 2 soon after on the same arrow; the 2 is not an effective downpress
+            2 -> 3 -> 2 immediately after on same arrow; not an effective downpress
+
+        When `adjust_for_staggered_brackets` is True, remove the second line in
+        a staggered bracket from counting as an effective downpress.
     """
+    if adjust_for_staggered_brackets:
+        skills.staggered_brackets(cs)
+        # True on the second line of a staggered bracket
+        staggered_brackets = list(cs.df['__staggered bracket'])
+
+    line_ahs = [l.replace('`', '') for l in cs.df['Line with active holds']]
+    lines = [l.replace('`', '') for l in cs.df['Line']]
+    times = list(cs.df['Time'])
+    repeats_prev_dp_idx = list(cs.df['__line repeats previous downpress line'])
+    time_since_prev_dp = list(cs.df['__time since prev downpress'])
+
     edp_times = []
-    for idx, row in cs.df.iterrows():
-        time = row['Time']
-        line = row['Line']
+    for idx in range(len(cs.df)):
+        time = times[idx]
+        line = lines[idx].replace('`', '')
         if not notelines.has_downpress(line):
              continue
         if idx == 0:
@@ -84,17 +106,33 @@ def calc_effective_downpress_times(cs: ChartStruct) -> list[float]:
         else:
             if notelines.is_hold_start(line):
                 crits = [
-                    line['__line repeats previous downpress line'],
-                    line['__time since prev downpress'] < HOLD_TIME_THRESHOLD
+                    repeats_prev_dp_idx[idx],
+                    time_since_prev_dp[idx] < HOLD_TIME_THRESHOLD
                 ]
                 if all(crits):
                     # hold repeats prev downpresses, and occurs soon after - skip
                     continue
-        
+
+            if '1' not in line and '2' in line:
+                # ok if 3 is in line too
+                # if all hold-starts in line only continue existing hold, or
+                # restart a hold that just ended,
+                # then this is not effective downpress
+                prev_line_ah = line_ahs[idx - 1]
+                hold_start_idxs = [i for i, s in enumerate(line) if s == '2']
+                if all([prev_line_ah[i] in '243' for i in hold_start_idxs]):
+                    if times[idx] - times[idx - 1] < 0.05:
+                        continue
+            
             if time < edp_times[-1] + 0.005:
                 # ignore notes very close together (faster than 200 nps);
                 # these are ssc artifacts
                 continue
+            
+            if adjust_for_staggered_brackets:
+                if staggered_brackets[idx]:
+                    continue
+
             edp_times.append(time)
     return edp_times
 

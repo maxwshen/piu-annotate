@@ -27,6 +27,12 @@ class DifficultyModelPredictor:
             '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts'
         )
 
+        dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/datasets/temp.pkl'
+        with open(dataset_fn, 'rb') as f:
+            dataset = pickle.load(f)
+        self.dataset = dataset
+        logger.info(f'Loaded dataset from {dataset_fn}')
+
     def load_models(self) -> None:
         logger.info(f'Loading difficulty models from {self.model_path}')
 
@@ -40,6 +46,20 @@ class DifficultyModelPredictor:
                 models[name] = model
         self.models = models
         return
+
+    def dists_to_closest_training_data(self, xs: npt.NDArray) -> npt.NDArray:
+        # (n, d)
+        train_data = self.dataset['x']
+        # xs is (b, d)
+
+        (b, d) = xs.shape
+        dists = np.linalg.norm(train_data - xs.reshape(b, 1, d), axis = -1)
+        # dists is (b, n)
+        closest_idxs = np.argmin(dists, axis = 1)
+        # shape: (b)
+
+        dist_to_closest = np.linalg.norm(train_data[closest_idxs] - xs, axis = 1)
+        return dist_to_closest
 
     def predict_segment_difficulties(self, cs: ChartStruct):
         """ Predict difficulties of chart segments.
@@ -64,6 +84,9 @@ class DifficultyModelPredictor:
         # predicted level tends to be low, as we featurize based on cruxes
         pred = y_all * (1/.95)
 
+        level = cs.get_chart_level()
+        pred[(pred <= level + 1)] += 0.5
+
         # if bracket pred. model predicts higher difficulty than base prediction,
         # adjust prediction upwards.
         # Empirically, this helps because base prediction tends to place too little
@@ -72,8 +95,17 @@ class DifficultyModelPredictor:
         w = 0.66
         pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
 
-        level = cs.get_chart_level()
-        pred[(pred <= level + 1)] += 0.5
+        # rare skill
+        rare_skill_cands = ['bracket-5', 'doublestep-5',
+                            'jump-5', 'jack-5', 'footswitch-5']
+        train_data = self.dataset['x']
+        for col in rare_skill_cands:
+            ft_idx = ft_names.index(col)
+            xs[:, ft_idx]
+            threshold = np.percentile(train_data[:, ft_idx], 97)
+            segments = xs[:, ft_idx] > threshold
+            if segments.any():
+                print(col, segments)
 
         debug = args.setdefault('debug', False)
         if debug:

@@ -51,7 +51,7 @@ def main():
         sections = segmentation(cs, debug = debug)
         cs.metadata['Segments'] = [s.to_tuple() for s in sections]
         cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
-        # cs.to_csv(inp_fn)
+        cs.to_csv(inp_fn)
 
     logger.success('done')
     return
