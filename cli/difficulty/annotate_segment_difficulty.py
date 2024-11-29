@@ -32,6 +32,7 @@ def annotate_segment_difficulty():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/'
         chartstruct_files = [
+            'Conflict_-_Siromaru_+_Cranky_S15_ARCADE.csv',
             'Mopemope_-_LeaF_D25_ARCADE.csv',
             'GLORIA_-_Croire_D21_ARCADE.csv',
             'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv',
@@ -66,7 +67,8 @@ def annotate_segment_difficulty():
         # update segment metadata dicts with level
         meta_dicts = [get_segment_metadata(cs, s) for s in sections]
         for md, sd in zip(meta_dicts, segment_dicts):
-            md.update(sd)
+            for k, v in sd.items():
+                md[k] = v
         cs.metadata['Segment metadata'] = meta_dicts
 
         cs.to_csv(inp_fn)

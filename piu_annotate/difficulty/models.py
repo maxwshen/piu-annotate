@@ -96,15 +96,26 @@ class DifficultyModelPredictor:
         y_all = self.predict(xs, sord)
 
         # prediction only using bracket frequencies
-        y_bracket = self.predict_skill_subset('bracket', xs, sord, ft_names)
+        # y_bracket = self.predict_skill_subset('bracket', xs, sord, ft_names)
         # y_edp = self.predict_skill_subset('edp', xs, sord, ft_names)
 
         # adjust base prediction upward
         # predicted level tends to be low, as we featurize based on cruxes
         pred = y_all * (1/.958)
 
-        level = cs.get_chart_level()
-        pred[(pred <= level + 1)] += 0.5
+        chart_level = cs.get_chart_level()
+
+        # adjust underrated charts down towards chart level
+        max_segment_level = max(pred)
+        if max_segment_level < chart_level:
+            # pick up segments with difficulty close to max
+            adjustment = (chart_level - max_segment_level) / 2
+            pred[(pred >= max_segment_level - 3)] += adjustment
+
+        before_rare_skill = pred.copy()
+
+        # clip
+        pred = np.clip(pred, 0.7, 28.3)
 
         # if bracket pred. model predicts higher difficulty than base prediction,
         # adjust prediction upwards.
@@ -112,17 +123,27 @@ class DifficultyModelPredictor:
         # importance on brackets.
         # print(pred)
         # print(y_bracket)
-        idxs = (y_bracket > pred)
-        w = 0.66
-        pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
+        # idxs = (y_bracket > pred)
+        # w = 0.66
+        # pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
         # print(pred)
 
         debug = args.setdefault('debug', False)
 
         # rare skill
-        rare_skill_cands = ['twistclose-5', 'doublestep-5', 'jump-2', 'jack-2',
-                            'edp-5', 'bracket-5',
-                            ]
+        rare_skill_cands = [
+            'twistclose-5', 
+            'jump-2', 
+            'jack-5',
+            'edp-5', 
+            'bracket-5',
+        ]
+        # only use doublestep as rare skill for manually annotated stepcharts,
+        # because doublestep is a common error for predicted limb annotations,
+        # especially on chart sections with holds and taps
+        if cs.metadata['Manual limb annotation']:
+            rare_skill_cands.append('doublestep-5')
+
         train_data = self.dataset['x']
         train_levels = self.dataset['y']
         # maps segment idx to list of rare skills
@@ -130,7 +151,7 @@ class DifficultyModelPredictor:
         for col in rare_skill_cands:
             ft_idx = ft_names.index(col)
             threshold = np.percentile(
-                train_data[train_levels <= level, ft_idx], 
+                train_data[train_levels <= chart_level, ft_idx], 
                 96
             )
             rare_skill_idxs = xs[:, ft_idx] > threshold
@@ -140,19 +161,20 @@ class DifficultyModelPredictor:
             
                 for i in np.where(rare_skill_idxs)[0]:
                     # set difficulty floor based on official stepchart level
-                    if pred[i] < level + 0.35:
-                        pred[i] = level + 0.35
+                    if pred[i] < chart_level + 0.35:
+                        pred[i] = chart_level + 0.35
                     else:
                         # for multiple rare skills, or if segment is already predicted
                         # to be hard, lift difficulty beyond
-                        if pred[i] == level + 0.35:
+                        if pred[i] == chart_level + 0.35:
                             pred[i] += 0.5
                     rare_skill_dd[i].append(col)
 
         if debug:
             print(cs.metadata['shortname'])
             print(y_all)
-            print(y_bracket)
+            print(before_rare_skill)
+            # print(y_bracket)
             # print(y_edp)
             # print(y_all * (1/.95) + 1)
             print(pred)

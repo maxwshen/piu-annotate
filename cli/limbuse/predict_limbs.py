@@ -75,14 +75,16 @@ def main():
             stats['Skipped because outfile exists'] += 1
             continue
 
-        # try:
+        manually_annotated = False
         if csv in cs_to_manual:
-            logger.info(f'updating with manual - {csv}')
             # if existing manual, load that json, and update cs with json
+            # logger.info(f'updating with manual - {csv}')
             manual_json = cs_to_manual[csv]
             cjs = ChartJsStruct.from_json(manual_json)
             cs.update_from_manual_json(cjs)
             stats['N updated from manual'] += 1
+            manually_annotated = True
+
         else:
             # logger.debug(f'predicting - {csv}')
             cs, fcs, pred_limbs = predict(cs, model_suite)
@@ -97,6 +99,9 @@ def main():
         #     logger.error(str(e))
         #     logger.error(csv)
         #     import code; code.interact(local=dict(globals(), **locals()))
+
+        # update metadata if manually annotated or not
+        cs.metadata['Manual limb annotation'] = manually_annotated
 
         # save to file
         cs.to_csv(out_fn)

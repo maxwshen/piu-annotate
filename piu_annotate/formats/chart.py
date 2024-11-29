@@ -509,6 +509,8 @@ class ChartStruct:
     def update_from_manual_json(self, chartjs: ChartJsStruct, verbose: bool = False) -> None:
         """ Updates ChartStruct given chart json, which can be manually
             annotated in step editor web app.
+            First checks that `chartjs` is compatible with ChartStruct, and throws
+            error if not. 
         """
         is_compatible = self.matches_chart_json(chartjs, with_limb_annot = False)
         if not is_compatible:
