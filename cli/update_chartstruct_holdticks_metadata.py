@@ -34,6 +34,11 @@ def main():
 
     rerun_all = args.setdefault('rerun_all', False)
 
+    if args.setdefault('debug', False):
+        chartstruct_files = [
+            'Ultimatum_-_Cosmograph_S21_ARCADE.csv'
+        ]
+
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         try:
@@ -54,6 +59,7 @@ def main():
         if args.setdefault('enps_annotations', False) or rerun_all:
             enps_annots = annotate_enps(cs)
             cs.metadata['eNPS annotations'] = enps_annots
+            import code; code.interact(local=dict(globals(), **locals()))
 
         # fix/edit lines that occur after LASTSECONDHINT
         # this impacts dement d24, mental rider d22

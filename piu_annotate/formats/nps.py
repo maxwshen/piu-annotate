@@ -210,7 +210,11 @@ def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
                 all_nps.append(nps)
                 annot_times.append(edp_times[i])
             else:
-                if round(nps) != round(all_nps[-1]):
+                # check "identical" = within 10%
+                prev_nps = all_nps[-1]
+                is_identical = (prev_nps * 0.9) <= nps <= (prev_nps * 1.1)
+
+                if not is_identical:
                     annots.append(annot)
                     all_nps.append(nps)
                     annot_times.append(edp_times[i])
@@ -222,3 +226,10 @@ def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
                         annot_times.append(edp_times[i])
 
     return list(zip(annot_times, annots))
+
+
+if __name__ == '__main__':
+    shortname = 'Ultimatum_-_Cosmograph_S21_ARCADE'
+    cs = ChartStruct.from_file('/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/' + shortname + '.csv')
+    annots = annotate_enps(cs)
+    import code; code.interact(local=dict(globals(), **locals()))
