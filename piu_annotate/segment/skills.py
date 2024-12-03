@@ -7,6 +7,7 @@ import itertools
 from loguru import logger
 import pandas as pd
 
+from hackerargs import args
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import notelines
 
@@ -575,6 +576,20 @@ def annotate_skills(cs: ChartStruct) -> None:
     jump(cs)
     twists_90(cs)
     twists_over90(cs)
+
+    # compound skills
+    cs.df['__bracket run'] = cs.df['__bracket'] & cs.df['__run']
+    cs.df['__bracket drill'] = cs.df['__bracket'] & cs.df['__drill']
+    cs.df['__bracket jump'] = cs.df['__bracket'] & cs.df['__jump']
+    cs.df['__bracket twist'] = cs.df['__bracket'] & (
+        cs.df['__twist 90'] | cs.df['__twist over90']
+    )
+
+    if args.setdefault('debug', False):
+        import numpy as np
+        df = cs.df
+        import code; code.interact(local=dict(globals(), **locals()))
+
     return
 
 

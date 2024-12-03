@@ -14,7 +14,7 @@ from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.segment.skills import annotate_skills
 from piu_annotate.difficulty import featurizers
 from piu_annotate.difficulty.models import DifficultyModelPredictor
-
+from cli.difficulty.train_difficulty_predictor import build_full_stepchart_dataset
 
 def main():
     # run on folder
@@ -26,17 +26,24 @@ def main():
     dmp = DifficultyModelPredictor()
     dmp.load_models()
 
+    dataset = build_full_stepchart_dataset()
+    file_to_x = {file: x for file, x in zip(dataset['files'], dataset['x'])}
+
     dd = defaultdict(list)
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         cs = ChartStruct.from_file(inp_fn)
+
+        x = file_to_x[cs_file]
+        x = x.reshape(1, -1)
+        pred_level = dmp.predict(x, cs.singles_or_doubles())
 
         smd = cs.metadata['Segment metadata']
         dd['shortname'].append(cs.metadata['shortname'])
         dd['max segment level'].append(max([md['level'] for md in smd]))
         dd['segment levels'].append([md['level'] for md in smd])
         dd['chart level'].append(cs.get_chart_level())
-        dd['pred level'].append(dmp.predict_stepchart(cs))
+        dd['pred level'].append(pred_level)
         dd['sord'].append(cs.singles_or_doubles())
         
     df = pd.DataFrame(dd)

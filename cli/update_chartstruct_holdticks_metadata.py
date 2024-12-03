@@ -59,7 +59,6 @@ def main():
         if args.setdefault('enps_annotations', False) or rerun_all:
             enps_annots = annotate_enps(cs)
             cs.metadata['eNPS annotations'] = enps_annots
-            import code; code.interact(local=dict(globals(), **locals()))
 
         # fix/edit lines that occur after LASTSECONDHINT
         # this impacts dement d24, mental rider d22

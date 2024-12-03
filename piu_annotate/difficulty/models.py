@@ -78,19 +78,16 @@ class DifficultyModelPredictor:
         x = x.reshape(1, -1)
         return self.predict(x, cs.singles_or_doubles())
 
-    def predict_segment_difficulties(self, cs: ChartStruct) -> list[dict]:
-        """ Predict difficulties of chart segments.
-            Featurizes each segment separately, which amounts to calculating
-            the highest frequency of skill events in varying-length time windows
-            in segment.
-
-            Returns a list of dicts, one dict per segment.
+    def predict_segments(
+        self, 
+        cs: ChartStruct, 
+        xs: npt.NDArray,
+        ft_names: list[str],
+    ) -> list[dict]:
+        """ Predicts segments featurized into `xs` from ChartStruct `cs`.
         """
-        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
-        fter = featurizers.DifficultyFeaturizer(cs)
-        ft_names = fter.get_feature_names()
-        xs = fter.featurize_sections(sections)
         sord = cs.singles_or_doubles()
+        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
 
         # prediction using all features
         y_all = self.predict(xs, sord)
@@ -131,33 +128,37 @@ class DifficultyModelPredictor:
         debug = args.setdefault('debug', False)
 
         # rare skill
-        rare_skill_cands = [
-            'twistclose-5', 
-            'jump-2', 
-            'jack-5',
-            'edp-5', 
-            'bracket-5',
-        ]
+        rare_skill_cands = {
+            'twistclose-5': 96, 
+            'jump-2': 96, 
+            'jack-5': 96,
+            'edp-5': 96, 
+            'bracket-5': 96,
+            'bracket run-5': 96,
+            'bracket drill-5': 96,
+            'bracket jump-5': 96,
+            'bracket twist-5': 96,
+        }
         # only use doublestep as rare skill for manually annotated stepcharts,
         # because doublestep is a common error for predicted limb annotations,
         # especially on chart sections with holds and taps
         if cs.metadata['Manual limb annotation']:
-            rare_skill_cands.append('doublestep-5')
+            rare_skill_cands['doublestep-7'] = 99
 
         train_data = self.dataset['x']
         train_levels = self.dataset['y']
         # maps segment idx to list of rare skills
         rare_skill_dd = defaultdict(list)
-        for col in rare_skill_cands:
-            ft_idx = ft_names.index(col)
+        for rare_skill_name, percentile_threshold in rare_skill_cands.items():
+            ft_idx = ft_names.index(rare_skill_name)
             threshold = np.percentile(
                 train_data[train_levels <= chart_level, ft_idx], 
-                96
+                percentile_threshold
             )
             rare_skill_idxs = xs[:, ft_idx] > threshold
             if rare_skill_idxs.any():
                 if debug:
-                    print(col, rare_skill_idxs)
+                    print(rare_skill_name, rare_skill_idxs)
             
                 for i in np.where(rare_skill_idxs)[0]:
                     # set difficulty floor based on official stepchart level
@@ -166,9 +167,11 @@ class DifficultyModelPredictor:
                     else:
                         # for multiple rare skills, or if segment is already predicted
                         # to be hard, lift difficulty beyond
-                        if pred[i] == chart_level + 0.35:
-                            pred[i] += 0.5
-                    rare_skill_dd[i].append(col)
+                        # if pred[i] == chart_level + 0.35:
+                            # pred[i] += 0.5
+                        pass
+
+                    rare_skill_dd[i].append(rare_skill_name)
 
         if debug:
             print(cs.metadata['shortname'])
@@ -188,6 +191,25 @@ class DifficultyModelPredictor:
             }
             segment_dicts.append(d)
 
+        return segment_dicts
+
+    def predict_segment_difficulties(self, cs: ChartStruct) -> list[dict]:
+        """ Predict difficulties of chart segments from `cs`, by
+            first featurizing segments in cs.
+
+            Featurizes each segment separately, which amounts to calculating
+            the highest frequency of skill events in varying-length time windows
+            in segment.
+
+            Returns a list of dicts, one dict per segment.
+        """
+        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+        fter = featurizers.DifficultyFeaturizer(cs)
+        ft_names = fter.get_feature_names()
+        xs = fter.featurize_sections(sections)
+        sord = cs.singles_or_doubles()
+
+        segment_dicts = self.predict_segments(xs, sord, ft_names)
         return segment_dicts
 
     def predict(self, xs: npt.NDArray, sord: str):

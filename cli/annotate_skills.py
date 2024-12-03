@@ -31,6 +31,18 @@ def main():
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
+    debug = args.setdefault('debug', False)
+    if debug:
+        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/'
+        chartstruct_files = [
+            # 'Mopemope_-_LeaF_D25_ARCADE.csv',
+            # 'Vacuum_-_Doin_S19_INFOBAR_TITLE_ARCADE.csv',
+            # 'Papasito_(feat.__KuTiNA)_-_FULL_SONG_-_-_Yakikaze_&_Cashew_S19_FULLSONG.csv',
+            # 'Papasito_(feat.__KuTiNA)_-_Yakikaze_&_Cashew_D21_ARCADE.csv',
+            'Sudden_Appearance_Image_-_Blacklolita_S21_ARCADE.csv',
+        ]
+        chartstruct_files = [folder + f for f in chartstruct_files]
+
     from collections import defaultdict
     dd = defaultdict(list)
     for cs_file in tqdm(chartstruct_files):
@@ -59,7 +71,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--csv',
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
+        # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/BOOOM!!_-_RiraN_D22_ARCADE.csv',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/My_Dreams_-_Banya_Production_D22_ARCADE.csv',

@@ -142,6 +142,10 @@ class DifficultyFeaturizer:
             'jump': times[cs.df['__jump']],
             'jack': times[cs.df['__jack']],
             'footswitch': times[cs.df['__footswitch']],
+            'bracket run': times[cs.df['__bracket run']],
+            'bracket drill': times[cs.df['__bracket drill']],
+            'bracket jump': times[cs.df['__bracket jump']],
+            'bracket twist': times[cs.df['__bracket twist']],
         }
         # reduce to event times for effective downpresses
         for k in event_times:
@@ -177,6 +181,10 @@ class DifficultyFeaturizer:
             'jump': times[cs.df['__jump']],
             'jack': times[cs.df['__jack']],
             'footswitch': times[cs.df['__footswitch']],
+            'bracket run': times[cs.df['__bracket run']],
+            'bracket drill': times[cs.df['__bracket drill']],
+            'bracket jump': times[cs.df['__bracket jump']],
+            'bracket twist': times[cs.df['__bracket twist']],
         }
 
         skill_nps_stats = dict()

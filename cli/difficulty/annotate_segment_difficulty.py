@@ -20,18 +20,61 @@ from piu_annotate.segment.segment import Section
 from piu_annotate.segment.segment_breaks import get_segment_metadata
 
 
-def annotate_segment_difficulty():
-    """ Runs pretrained stepchart difficulty prediction model on segments.
+def build_segment_dataset():
+    """ Featurizes segments, storing into pkl.
+        If pkl already exists, loads from file.
     """
+    dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/segments/feature-stores.pkl'
+    if not args.setdefault('rerun', False):
+        if os.path.exists(dataset_fn):
+            with open(dataset_fn, 'rb') as f:
+                dataset = pickle.load(f)
+            logger.info(f'Loaded dataset from {dataset_fn}')
+            return dataset
+
     cs_folder = args['chart_struct_csv_folder']
     logger.info(f'Using {cs_folder=}')
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
-    debug = args.setdefault('debug', False)
-    if debug:
-        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/'
+    dataset = dict()
+
+    logger.info(f'Building featurized segments ...')
+    for cs_file in tqdm(chartstruct_files):
+        inp_fn = os.path.join(cs_folder, cs_file)
+        cs = ChartStruct.from_file(inp_fn)
+        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+
+        fter = featurizers.DifficultyFeaturizer(cs)
+        ft_names = fter.get_feature_names()
+        xs = fter.featurize_sections(sections)
+
+        shortname = cs.metadata['shortname']
+        dataset[shortname] = xs
+
+    dataset['feature names'] = ft_names
+
+    with open(dataset_fn, 'wb') as f:
+        pickle.dump(dataset, f)
+    logger.info(f'Saved dataset to {dataset_fn}')
+    return dataset
+
+
+def annotate_segments(dataset: dict):
+    cs_folder = args['chart_struct_csv_folder']
+    logger.info(f'Using {cs_folder=}')
+    chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
+    logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
+
+    ft_names = dataset['feature names']
+
+    # Load models
+    dmp = DifficultyModelPredictor()
+    dmp.load_models()
+
+    if args.setdefault('debug', False):
         chartstruct_files = [
+            'Papasito_(feat.__KuTiNA)_-_FULL_SONG_-_-_Yakikaze_&_Cashew_S19_FULLSONG.csv',
             'Conflict_-_Siromaru_+_Cranky_S15_ARCADE.csv',
             'Mopemope_-_LeaF_D25_ARCADE.csv',
             'GLORIA_-_Croire_D21_ARCADE.csv',
@@ -51,18 +94,16 @@ def annotate_segment_difficulty():
             'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv',
             'BOOOM!!_-_RiraN_D22_ARCADE.csv'
         ]
-        chartstruct_files = [folder + f for f in chartstruct_files]
-
-    # Load models
-    dmp = DifficultyModelPredictor()
-    dmp.load_models()
+        chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
 
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         cs = ChartStruct.from_file(inp_fn)
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+        shortname = cs.metadata['shortname']
 
-        segment_dicts = dmp.predict_segment_difficulties(cs)
+        xs = dataset[shortname]        
+        segment_dicts = dmp.predict_segments(cs, xs, ft_names)
 
         # update segment metadata dicts with level
         meta_dicts = [get_segment_metadata(cs, s) for s in sections]
@@ -76,9 +117,10 @@ def annotate_segment_difficulty():
     return
 
 
-
 def main():
-    annotate_segment_difficulty()
+    dataset = build_segment_dataset()
+    annotate_segments(dataset)
+
     logger.success('done')
     return
 
