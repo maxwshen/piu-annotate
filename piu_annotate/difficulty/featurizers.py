@@ -17,122 +17,7 @@ from piu_annotate.segment.skills import annotate_skills
 from piu_annotate.formats.nps import calc_effective_downpress_times
 from piu_annotate.segment.segment import Section
 from piu_annotate.difficulty import travel
-
-
-def calc_max_event_frequency(times: list[float], t: float) -> float:
-    """ Given `times`: list of times where event happens (such as downpress),
-        with units in seconds, and window size `t` (in seconds), 
-        computes the highest event frequency in any sliding window `t`.
-        Returns float: units = events per second
-    """
-    if len(times) == 0:
-        return 0.0
-    
-    n = len(times)
-    if n == 1:
-        return 1.0 / t
-    
-    # Use two-pointer technique to maintain a sliding window
-    left = 0
-    max_frequency = 0.0
-    
-    for right in range(n):
-        # Shrink window from left while it exceeds size t
-        while left < right and times[right] - times[left] > t:
-            left += 1
-            
-        # Calculate frequency in current window
-        events_in_window = right - left + 1
-        frequency = events_in_window / t
-        max_frequency = max(max_frequency, frequency)
-
-    return max_frequency
-
-
-def smallest_positive_difference(
-    queries: npt.NDArray, 
-    refs: npt.NDArray, 
-    shift: bool = False
-):
-    """
-    Find the smallest positive difference between each query and the largest 
-    reference value less than the query.
-    
-    Parameters:
-    -----------
-    queries : numpy.ndarray
-        Input array of shape (n,)
-    refs : numpy.ndarray
-        Reference array of shape (m,)
-    shift : bool
-        If True, shift found indices left by 1 more. This is used to handle
-        staggered brackets.
-        
-    Returns:
-    --------
-    numpy.ndarray
-        Array of shape (n,) with smallest positive differences
-    """
-    # Sort the reference array
-    sorted_refs = np.sort(refs)
-    
-    # Find the indices of the largest values less than each query
-    # Using searchsorted for efficient lookup
-    indices = np.searchsorted(sorted_refs, queries, side='left') - 1
-
-    if shift:
-        indices -= 1
-
-    # Handle cases where no reference is less than the query
-    valid_mask = indices >= 0
-    
-    # Initialize result array
-    result = np.full_like(queries, np.nan, dtype=float)
-    
-    # Compute the differences for valid indices
-    result[valid_mask] = queries[valid_mask] - sorted_refs[indices[valid_mask]]
-    return result
-
-
-def find_longest_true_run(values: list[bool]) -> tuple[int, int]:
-    """
-    Find the start and end indices of the longest consecutive run of True values.
-    
-    Args:
-        values (list[bool]): List of boolean values
-        
-    Returns:
-        tuple[int, int]: (start_index, end_index) of the longest run.
-                        If no True values exist, returns (-1, -1).
-                        The end_index is inclusive.
-    """
-    if len(values) == 0:
-        return (-1, -1)
-    
-    max_length = 0
-    max_start = -1
-    max_end = -1
-    
-    current_start = 0
-    current_length = 0
-    
-    for i, value in enumerate(values):
-        if value:
-            # Extend current run
-            if current_length == 0:
-                current_start = i
-            current_length += 1
-            
-            # Update max if current run is longer
-            if current_length > max_length:
-                max_length = current_length
-                max_start = current_start
-                max_end = i
-        else:
-            # Reset current run
-            current_length = 0
-    
-    return (max_start, max_end)
+from piu_annotate.difficulty import utils
 
 
 class DifficultySegmentFeaturizer:
@@ -233,7 +118,7 @@ class DifficultySegmentFeaturizer:
             # to calculate time since effective downpress *before* staggered bracket,
             # we use shift
             if len(times) > 0:
-                time_since_edp = smallest_positive_difference(
+                time_since_edp = utils.smallest_positive_difference(
                     times, 
                     all_edp_times,
                     shift = bool(skill == 'staggered_bracket'),
@@ -248,6 +133,42 @@ class DifficultySegmentFeaturizer:
                 skill_nps_stats[f'{skill}-75thpct'] = 0
 
         return skill_nps_stats
+
+    def get_run_features(self, section: Section):
+        """ Get features of longest run """
+        df = self.cs.df
+        run_flags = list(df['__run'])[section.start : section.end + 1]
+
+        run_start, run_end = utils.find_longest_true_run(run_flags)
+        run_end = run_end + 1
+
+        # travel
+        lines = self.cs.get_lines()[section.start + run_start : section.start + run_end]        
+        dists = travel.calc_travel(lines)
+
+        # longest run with bracket
+        runs = utils.extract_consecutive_true_runs(run_flags)
+        run_with_brackets = []
+        bracket_run_flags = list(df['__bracket run'])
+        for run in runs:
+            run_start, run_end = run
+            # require at least 3 brackets in run
+            if sum(bracket_run_flags[section.start + run_start : section.start + run_end + 1]) >= 3:
+                run_with_brackets.append(run)
+
+        get_length = lambda tpl: tpl[1] - tpl[0] + 1
+        max_len_run_with_brackets = 0
+        if run_with_brackets:
+            max_len_run_with_brackets = max([get_length(r) for r in run_with_brackets])
+
+        d = {
+            'run - max len lines': run_end - run_start,
+            'run - travel mean': np.mean(dists) if dists else 0,
+            'run - travel 80pct': np.percentile(dists, 80) if dists else 0,
+            'run - travel 95pct': np.percentile(dists, 95) if dists else 0,
+            'run with bracket - max len lines': max_len_run_with_brackets,
+        }
+        return d
 
     def get_feature_dict(self, section: Section) -> dict[str, float]:
         """ Returns dict of {feature name: value}.
@@ -266,7 +187,7 @@ class DifficultySegmentFeaturizer:
         fts = dict()
         for event, ts in event_times.items():
             for t in self.window_times:
-                fq = calc_max_event_frequency(ts, t)
+                fq = utils.calc_max_event_frequency(ts, t)
 
                 # do not adjust event frequency if section is shorter than window
 
@@ -280,26 +201,6 @@ class DifficultySegmentFeaturizer:
         fts.update(self.get_run_features(section))
 
         return fts
-
-    def get_run_features(self, section: Section):
-        """ Get features of longest run """
-        df = self.cs.df
-        run_flags = list(df['__run'])[section.start : section.end + 1]
-
-        run_start, run_end = find_longest_true_run(run_flags)
-        run_end = run_end + 1
-
-        lines = self.cs.get_lines()[section.start + run_start : section.start + run_end]        
-        
-        dists = travel.calc_travel(lines)
-
-        d = {
-            'run - max len lines': run_end - run_start,
-            'run - travel mean': np.mean(dists) if dists else 0,
-            'run - travel 80pct': np.percentile(dists, 80) if dists else 0,
-            'run - travel 95pct': np.percentile(dists, 95) if dists else 0,
-        }
-        return d
 
     """
         Public methods
@@ -422,7 +323,7 @@ class DifficultyStepchartFeaturizer:
             # to calculate time since effective downpress *before* staggered bracket,
             # we use shift
             if len(times) > 0:
-                time_since_edp = smallest_positive_difference(
+                time_since_edp = utils.smallest_positive_difference(
                     times, 
                     all_edp_times,
                     shift = bool(skill == 'staggered_bracket'),
@@ -456,7 +357,7 @@ class DifficultyStepchartFeaturizer:
         fts = dict()
         for event, ts in event_times.items():
             for t in self.window_times:
-                fq = calc_max_event_frequency(ts, t)
+                fq = utils.calc_max_event_frequency(ts, t)
 
                 if section:
                     # if section is shorter than time window,
@@ -495,16 +396,18 @@ class DifficultyStepchartFeaturizer:
 
 if __name__ == '__main__':
     folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/'
-    # fn = folder + 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv'
-    # fn = folder + 'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv'
-    fn = folder + 'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv'
-    # fn = folder + 'Life_is_PIANO_-_Junk_D21_ARCADE.csv'
-    # fn = folder + 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv'
-    cs = ChartStruct.from_file(fn)
+    # fn = 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv'
+    # fn = 'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv'
+    # fn = 'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv'
+    fn = 'GLORIA_-_Croire_D21_ARCADE.csv'
+    # fn = 'Life_is_PIANO_-_Junk_D21_ARCADE.csv'
+    # fn = 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv'
+    cs = ChartStruct.from_file(os.path.join(folder, fn))
     fter = DifficultySegmentFeaturizer(cs)
 
     sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
     xs = fter.featurize_sections(sections)
+    ft_names = fter.get_feature_names()
     # print(xs)
     import code; code.interact(local=dict(globals(), **locals()))
 

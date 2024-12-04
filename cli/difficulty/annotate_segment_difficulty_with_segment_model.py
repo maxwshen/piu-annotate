@@ -74,17 +74,18 @@ def annotate_segments(dataset: dict):
 
     if args.setdefault('debug', False):
         chartstruct_files = [
-            'The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog_-_Doin_D24_ARCADE.csv',
-            'Good_Night_-_Dreamcatcher_D22_ARCADE.csv',
-            'PRiMA_MATERiA_-_xi_D24_ARCADE.csv',
-            'Full_Moon_-_Dreamcatcher_D20_ARCADE.csv',
-            'Full_Moon_-_Dreamcatcher_D24_ARCADE.csv',
-            'Mopemope_-_LeaF_D25_ARCADE.csv',
-            'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
-            'My_Dreams_-_Banya_Production_D22_ARCADE.csv',
-            'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv',
-            'GLORIA_-_Croire_D25_ARCADE.csv',
-            'Life_is_PIANO_-_Junk_D21_ARCADE.csv',
+            'GLORIA_-_Croire_D21_ARCADE.csv',
+            # 'The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog_-_Doin_D24_ARCADE.csv',
+            # 'Good_Night_-_Dreamcatcher_D22_ARCADE.csv',
+            # 'PRiMA_MATERiA_-_xi_D24_ARCADE.csv',
+            # 'Full_Moon_-_Dreamcatcher_D20_ARCADE.csv',
+            # 'Full_Moon_-_Dreamcatcher_D24_ARCADE.csv',
+            # 'Mopemope_-_LeaF_D25_ARCADE.csv',
+            # 'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv',
+            # 'My_Dreams_-_Banya_Production_D22_ARCADE.csv',
+            # 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv',
+            # 'GLORIA_-_Croire_D25_ARCADE.csv',
+            # 'Life_is_PIANO_-_Junk_D21_ARCADE.csv',
             # '8_6_-_FULL_SONG_-_-_DASU_S21_FULLSONG.csv',
             # 'BOOOM!!_-_RiraN_D22_ARCADE.csv',
             # 'Papasito_(feat.__KuTiNA)_-_FULL_SONG_-_-_Yakikaze_&_Cashew_S19_FULLSONG.csv',
@@ -99,7 +100,7 @@ def annotate_segments(dataset: dict):
             # 'The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
             # 'Super_Fantasy_-_SHK_S16_INFOBAR_TITLE_ARCADE.csv',
             # 'HTTP_-_Quree_S21_ARCADE.csv',
-            # 'GOODBOUNCE_-_EBIMAYO_D21_ARCADE.csv',
+            'GOODBOUNCE_-_EBIMAYO_D21_ARCADE.csv',
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
 
@@ -119,7 +120,7 @@ def annotate_segments(dataset: dict):
                 md[k] = v
         cs.metadata['Segment metadata'] = meta_dicts
 
-        # cs.to_csv(inp_fn)
+        cs.to_csv(inp_fn)
 
     return
 
