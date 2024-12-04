@@ -35,11 +35,13 @@ def main():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/'
         chartstruct_files = [
+            'Rock_the_house_-_Matduke_D22_INFOBAR_TITLE_ARCADE.csv',
+            # 'The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog_-_Doin_D24_ARCADE.csv',
             # 'Mopemope_-_LeaF_D25_ARCADE.csv',
             # 'Vacuum_-_Doin_S19_INFOBAR_TITLE_ARCADE.csv',
             # 'Papasito_(feat.__KuTiNA)_-_FULL_SONG_-_-_Yakikaze_&_Cashew_S19_FULLSONG.csv',
             # 'Papasito_(feat.__KuTiNA)_-_Yakikaze_&_Cashew_D21_ARCADE.csv',
-            'Sudden_Appearance_Image_-_Blacklolita_S21_ARCADE.csv',
+            # 'Sudden_Appearance_Image_-_Blacklolita_S21_ARCADE.csv',
         ]
         chartstruct_files = [folder + f for f in chartstruct_files]
 

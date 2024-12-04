@@ -174,6 +174,7 @@ class DifficultySegmentFeaturizer:
         times = self.times
         cs = self.cs
         event_times = {
+            'edp': np.array(self.edp_times),
             'bracket': self.bracket_times,
             'twist90': times[cs.df['__twist 90']],
             'twistclose': times[cs.df['__twist close']],
@@ -214,6 +215,9 @@ class DifficultySegmentFeaturizer:
 
         # use event_times
         skills = copy.deepcopy(event_times)
+
+        # exclude edp
+        skills.pop('edp')
 
         # special handling for bracket / staggered bracket
         # consider them separately
@@ -285,7 +289,7 @@ class DifficultySegmentFeaturizer:
         run_start, run_end = find_longest_true_run(run_flags)
         run_end = run_end + 1
 
-        lines = cs.get_lines()[section.start + run_start : section.start + run_end]        
+        lines = self.cs.get_lines()[section.start + run_start : section.start + run_end]        
         
         dists = travel.calc_travel(lines)
 

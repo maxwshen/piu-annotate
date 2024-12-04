@@ -96,6 +96,11 @@ def build_dataset(ft_store_segment: dict, ft_store_stepchart: dict) -> dict:
     dmp = DifficultyStepchartModelPredictor()
     dmp.load_models()
 
+    if args.setdefault('debug', False):
+        chartstruct_files = [
+
+        ]
+
     all_xs = []
     all_ys = []
     singles_or_doubles = []
@@ -114,6 +119,9 @@ def build_dataset(ft_store_segment: dict, ft_store_stepchart: dict) -> dict:
         # get cruxes by level close to hardest predicted segment
         crux_level_pickup = 1.5
         idxs = [i for i, lv in enumerate(y) if lv >= max(y) - crux_level_pickup]
+
+        # include sections with long 16th note runs
+        # todo?
 
         # subset to cruxes
         segment_xs = ft_store_segment[shortname]

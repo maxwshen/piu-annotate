@@ -24,6 +24,32 @@ MIN_POSITION_NOTES_LEN = 8
 STAGGERED_BRACKET_TIME_SINCE_THRESHOLD = 1/13
 
 
+def extract_consecutive_true_runs(bools: list[bool]) -> list[tuple[int, int]]:
+    """ Given a list of bools, returns a list of tuples of start_idx, end_idx
+        (inclusive) for each consecutive run of True in `bools`.
+    """
+    if not bools:
+        return []
+    
+    runs = []
+    current_run_start = None
+    
+    for idx, val in enumerate(bools):
+        if val and current_run_start is None:
+            # Start of a new True run
+            current_run_start = idx
+        elif not val and current_run_start is not None:
+            # End of a True run
+            runs.append((current_run_start, idx - 1))
+            current_run_start = None
+    
+    # Check if the last run goes to the end of the list
+    if current_run_start is not None:
+        runs.append((current_run_start, len(bools) - 1))
+    
+    return runs
+
+
 """
     Line has ...
 """
@@ -129,13 +155,29 @@ def run(cs: ChartStruct) -> None:
             len(set(limb_annots[i])) == 1,
             len(set(limb_annots[j])) == 1,
             '1' in lines[j],
-            not drills[j],
             math.isclose(ts[i], ts[j])
         ]
         if all(crits):
             idxs.add(j)
 
-    cs.df['__run'] = filter_short_runs(idxs, len(df), MIN_RUN_LEN)  
+    # if any run is entirely contained within a drill, do not label as run
+    drill_sections = extract_consecutive_true_runs(drills)
+    runs = filter_short_runs(idxs, len(df), MIN_RUN_LEN)
+    run_sections = extract_consecutive_true_runs(runs)
+
+    def run_in_any_drill(run_start: int, run_end: int):
+        return any(
+            run_start >= drill_start and run_end <= drill_end
+            for drill_start, drill_end in drill_sections
+        )
+
+    for run in run_sections:
+        run_start, run_end = run
+        if run_in_any_drill(run_start, run_end):
+            run_len = run_end - run_start + 1
+            runs[run_start : run_end + 1] = [False] * run_len
+
+    cs.df['__run'] = runs
     return
 
 
