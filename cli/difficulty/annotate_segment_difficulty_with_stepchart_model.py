@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate import utils
 from piu_annotate.difficulty import featurizers
-from piu_annotate.difficulty.models import DifficultyModelPredictor
+from piu_annotate.difficulty.models import DifficultyStepchartModelPredictor
 from piu_annotate.segment.segment import Section
 from piu_annotate.segment.segment_breaks import get_segment_metadata
 
@@ -24,7 +24,7 @@ def build_segment_dataset():
     """ Featurizes segments, storing into pkl.
         If pkl already exists, loads from file.
     """
-    dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/segments/feature-stores.pkl'
+    dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/segments/feature-store-stepchart.pkl'
     if not args.setdefault('rerun', False):
         if os.path.exists(dataset_fn):
             with open(dataset_fn, 'rb') as f:
@@ -45,7 +45,7 @@ def build_segment_dataset():
         cs = ChartStruct.from_file(inp_fn)
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
 
-        fter = featurizers.DifficultyFeaturizer(cs)
+        fter = featurizers.DifficultyStepchartFeaturizer(cs)
         ft_names = fter.get_feature_names()
         xs = fter.featurize_sections(sections)
 
@@ -69,7 +69,7 @@ def annotate_segments(dataset: dict):
     ft_names = dataset['feature names']
 
     # Load models
-    dmp = DifficultyModelPredictor()
+    dmp = DifficultyStepchartModelPredictor()
     dmp.load_models()
 
     if args.setdefault('debug', False):

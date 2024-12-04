@@ -10,7 +10,6 @@ from hackerargs import args
 from loguru import logger
 from collections import defaultdict
 
-from sklearn.ensemble import HistGradientBoostingRegressor
 import lightgbm as lgb
 from lightgbm import Booster
 
@@ -19,14 +18,134 @@ from piu_annotate.difficulty import featurizers
 from piu_annotate.segment.segment import Section
 
 
-class DifficultyModelPredictor:
+class DifficultySegmentModelPredictor:
     def __init__(self):
-        """ Class for predicting difficulty of chart segments.
+        self.model_path = args.setdefault(
+            'segment_difficulty_models_path',
+            '/home/maxwshen/piu-annotate/artifacts/difficulty/segments/'
+        )
+
+        stepchart_dataset_fn = '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/datasets/temp.pkl'
+        with open(stepchart_dataset_fn, 'rb') as f:
+            dataset = pickle.load(f)
+        self.stepchart_dataset = dataset
+        logger.info(f'Loaded dataset from {stepchart_dataset_fn}')
+
+    def load_models(self) -> None:
+        logger.info(f'Loading segment difficulty models from {self.model_path}')
+
+        models: dict[str, Booster] = dict()
+        for sd in ['singles', 'doubles']:
+            name = f'{sd}'
+            logger.info(f'Loaded model: {name}')
+            model_fn = os.path.join(self.model_path, f'lgbm-{name}.txt')
+            model = lgb.Booster(model_file = model_fn)
+            models[name] = model
+        self.models = models
+        return
+
+    def predict_segments(
+        self, 
+        cs: ChartStruct, 
+        xs: npt.NDArray,
+        ft_names: list[str],
+    ) -> list[dict]:
+        """ Predicts segments featurized into `xs` from ChartStruct `cs`.
+        """
+        sord = cs.singles_or_doubles()
+        chart_level = cs.get_chart_level()
+        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+
+        # prediction using all features
+        model = self.models[sord]
+        y_all = model.predict(xs)
+        pred = y_all.copy()
+
+        # clip
+        pred = np.clip(pred, 0.7, 28.3)
+
+        debug = args.setdefault('debug', False)
+
+        # rare skill
+        rare_skill_cands = {
+            'twistclose-5': 96, 
+            'jump-2': 96, 
+            'jack-5': 96,
+            'bracket-5': 96,
+            'bracket run-5': 96,
+            'bracket drill-5': 96,
+            'bracket jump-5': 96,
+            'bracket twist-5': 96,
+        }
+        # only use doublestep as rare skill for manually annotated stepcharts,
+        # because doublestep is a common error for predicted limb annotations,
+        # especially on chart sections with holds and taps
+        if cs.metadata['Manual limb annotation']:
+            rare_skill_cands['doublestep-7'] = 99
+
+        stepchart_data = self.stepchart_dataset['x']
+        stepchart_levels = self.stepchart_dataset['y']
+        # maps segment idx to list of rare skills
+        rare_skill_dd = defaultdict(list)
+        for rare_skill_name, percentile_threshold in rare_skill_cands.items():
+            ft_idx = ft_names.index(rare_skill_name)
+            threshold = np.percentile(
+                stepchart_data[stepchart_levels <= chart_level, ft_idx], 
+                percentile_threshold
+            )
+            rare_skill_idxs = xs[:, ft_idx] > threshold
+            if rare_skill_idxs.any():
+                for i in np.where(rare_skill_idxs)[0]:
+                    rare_skill_dd[i].append(rare_skill_name)
+                if debug:
+                    print(rare_skill_name, rare_skill_idxs)
+
+        if debug:
+            print(cs.metadata['shortname'])
+            print(y_all)
+            print(pred)
+            import code; code.interact(local=dict(globals(), **locals()))
+
+        segment_dicts = []
+        for i in range(len(sections)):
+            d = {
+                'level': np.round(pred[i], 2),
+                'rare skills': rare_skill_dd[i],
+            }
+            segment_dicts.append(d)
+        return segment_dicts
+
+    def predict_segment_difficulties(self, cs: ChartStruct) -> list[dict]:
+        """ Predict difficulties of chart segments from `cs`, by
+            first featurizing segments in cs.
+
+            Featurizes each segment separately, which amounts to calculating
+            the highest frequency of skill events in varying-length time windows
+            in segment.
+
+            Returns a list of dicts, one dict per segment.
+        """
+        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+        fter = featurizers.DifficultySegmentFeaturizer(cs)
+        ft_names = fter.get_feature_names()
+        xs = fter.featurize_sections(sections)
+        sord = cs.singles_or_doubles()
+
+        segment_dicts = self.predict_segments(xs, sord, ft_names)
+        return segment_dicts
+
+
+class DifficultyStepchartModelPredictor:
+    def __init__(self):
+        """ Holds models trained to predict difficulty on stepcharts.
+            Class exposes methods for running predictions on new stepcharts,
+            or on segments.
+
             Loads multiple models trained on potentially different subsets of
             features, and can combine models to form final prediction.
         """
         self.model_path = args.setdefault(
-            'difficulty_models_path',
+            'stepchart_difficulty_models_path',
             '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts'
         )
 
@@ -37,16 +156,8 @@ class DifficultyModelPredictor:
         logger.info(f'Loaded dataset from {dataset_fn}')
 
     def load_models(self) -> None:
-        logger.info(f'Loading difficulty models from {self.model_path}')
+        logger.info(f'Loading stepchart difficulty models from {self.model_path}')
 
-        # models: dict[str, HistGradientBoostingRegressor] = dict()
-        # for sd in ['singles', 'doubles']:
-        #     for feature_subset in ['all', 'bracket', 'edp']:
-        #         name = f'{sd}-{feature_subset}'
-        #         logger.info(f'Loaded model: {name}')
-        #         with open(os.path.join(self.model_path, name + '.pkl'), 'rb') as f:
-        #             model: HistGradientBoostingRegressor = pickle.load(f)
-        #         models[name] = model
         models: dict[str, Booster] = dict()
         for sd in ['singles', 'doubles']:
             for feature_subset in ['all', 'bracket', 'edp']:
@@ -58,22 +169,8 @@ class DifficultyModelPredictor:
         self.models = models
         return
 
-    def dists_to_closest_training_data(self, xs: npt.NDArray) -> npt.NDArray:
-        # (n, d)
-        train_data = self.dataset['x']
-        # xs is (b, d)
-
-        (b, d) = xs.shape
-        dists = np.linalg.norm(train_data - xs.reshape(b, 1, d), axis = -1)
-        # dists is (b, n)
-        closest_idxs = np.argmin(dists, axis = 1)
-        # shape: (b)
-
-        dist_to_closest = np.linalg.norm(train_data[closest_idxs] - xs, axis = 1)
-        return dist_to_closest
-
     def predict_stepchart(self, cs: ChartStruct):
-        fter = featurizers.DifficultyFeaturizer(cs)
+        fter = featurizers.DifficultyStepchartFeaturizer(cs)
         x = fter.featurize_full_stepchart()
         x = x.reshape(1, -1)
         return self.predict(x, cs.singles_or_doubles())
@@ -102,7 +199,7 @@ class DifficultyModelPredictor:
 
         chart_level = cs.get_chart_level()
 
-        # adjust underrated charts down towards chart level
+        # adjust underrated charts towards chart level
         max_segment_level = max(pred)
         if max_segment_level < chart_level:
             # pick up segments with difficulty close to max
@@ -113,17 +210,6 @@ class DifficultyModelPredictor:
 
         # clip
         pred = np.clip(pred, 0.7, 28.3)
-
-        # if bracket pred. model predicts higher difficulty than base prediction,
-        # adjust prediction upwards.
-        # Empirically, this helps because base prediction tends to place too little
-        # importance on brackets.
-        # print(pred)
-        # print(y_bracket)
-        # idxs = (y_bracket > pred)
-        # w = 0.66
-        # pred[idxs] = (1 - w) * pred[idxs] + w * y_bracket[idxs]
-        # print(pred)
 
         debug = args.setdefault('debug', False)
 
@@ -204,7 +290,7 @@ class DifficultyModelPredictor:
             Returns a list of dicts, one dict per segment.
         """
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
-        fter = featurizers.DifficultyFeaturizer(cs)
+        fter = featurizers.DifficultyStepchartFeaturizer(cs)
         ft_names = fter.get_feature_names()
         xs = fter.featurize_sections(sections)
         sord = cs.singles_or_doubles()

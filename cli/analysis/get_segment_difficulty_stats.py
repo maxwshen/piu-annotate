@@ -13,7 +13,7 @@ from collections import defaultdict
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.segment.skills import annotate_skills
 from piu_annotate.difficulty import featurizers
-from piu_annotate.difficulty.models import DifficultyModelPredictor
+from piu_annotate.difficulty.models import DifficultyStepchartModelPredictor
 from cli.difficulty.train_difficulty_predictor import build_full_stepchart_dataset
 
 def main():
@@ -23,7 +23,7 @@ def main():
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
-    dmp = DifficultyModelPredictor()
+    dmp = DifficultyStepchartModelPredictor()
     dmp.load_models()
 
     dataset = build_full_stepchart_dataset()

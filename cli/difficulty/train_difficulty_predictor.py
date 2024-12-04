@@ -42,7 +42,7 @@ def build_full_stepchart_dataset():
         cs = ChartStruct.from_file(inp_fn)
 
         # featurize
-        fter = featurizers.DifficultyFeaturizer(cs)
+        fter = featurizers.DifficultyStepchartFeaturizer(cs)
         x = fter.featurize_full_stepchart()
         X.append(x)
 
@@ -62,52 +62,6 @@ def build_full_stepchart_dataset():
         pickle.dump(dataset, f)
     logger.info(f'Saved dataset to {dataset_fn}')
     return dataset
-
-
-def train_hist(
-    dataset: dict, 
-    singles_or_doubles: str,
-    feature_subset: str = 'all',
-):
-    """ Trains a monotonic HistGradientBoostingRegressor
-        to predict stepchart difficulty
-    """
-    from sklearn.ensemble import HistGradientBoostingRegressor
-    # train/test split
-    sd_selector = np.where(np.array(dataset['singles_or_doubles']) == singles_or_doubles)
-    points = dataset['x'][sd_selector]
-    labels = dataset['y'][sd_selector]
-    feature_names = dataset['feature_names']
-
-    if feature_subset != 'all':
-        ok_idxs = [i for i, nm in enumerate(feature_names) if feature_subset in nm]
-        logger.info(f'Using {feature_subset=} with {len(ok_idxs)} features ...')
-        points = points[:, ok_idxs]
-
-    train_x, test_x, train_y, test_y = train_test_split(
-        points, labels, test_size = 0.05, random_state = 0
-    )
-    
-    model = HistGradientBoostingRegressor(monotonic_cst = [1] * points.shape[-1])
-    model.fit(train_x, train_y)
-
-    from scipy.stats import linregress
-    test_pred = model.predict(test_x)
-    train_pred = model.predict(train_x)
-    logger.info('hist')
-    logger.info(model.score(train_x, train_y))
-    logger.info(model.score(test_x, test_y))
-    logger.info(singles_or_doubles)
-    logger.info(f'train set: {linregress(train_pred, train_y)}')
-    logger.info(f'val set: {linregress(test_pred, test_y)}')
-
-    import pickle
-    model_dir = '/home/maxwshen/piu-annotate/artifacts/difficulty/full-stepcharts/'
-    model_fn = os.path.join(model_dir, f'{singles_or_doubles}-{feature_subset}.pkl')
-    with open(model_fn, 'wb') as f:
-        pickle.dump(model, f)
-    logger.info(f'Saved model to {model_fn}')
-    return
 
 
 def train_lgbm(
@@ -173,7 +127,6 @@ def main():
     for sd in ['singles', 'doubles']:
         # for feature_subset in ['all']:
         for feature_subset in ['all', 'bracket', 'edp']:
-            train_hist(dataset, sd, feature_subset = feature_subset)
             train_lgbm(dataset, sd, feature_subset = feature_subset)
 
     logger.success('done')
