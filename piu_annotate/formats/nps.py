@@ -101,18 +101,19 @@ def calc_effective_downpress_times(
     for idx in range(len(cs.df)):
         time = times[idx]
         line = lines[idx]
+
+        # track time of hold releases
+        panel_to_action = notelines.panel_idx_to_action(line)
+        for panel, action in panel_to_action.items():
+            if action == '3':
+                limb = notelines.get_limb_for_arrow_pos(line_ahs[idx], limb_annots[idx], panel)
+                prev_hold_releases[panel] = (time, limb)
+
         if not notelines.has_downpress(line):
              continue
         if idx == 0:
             edp_times.append(time)
         else:
-            # track time of hold releases
-            panel_to_action = notelines.panel_idx_to_action(line)
-            for panel, action in panel_to_action.items():
-                if action == '3':
-                    limb = notelines.get_limb_for_arrow_pos(line_ahs[idx], limb_annots[idx], panel)
-                    prev_hold_releases[panel] = (time, limb)
-
             if notelines.is_hold_start(line):
                 crits = [
                     repeats_prev_dp_idx[idx],

@@ -399,7 +399,8 @@ if __name__ == '__main__':
     # fn = 'Dement_~After_Legend~_-_Lunatic_Sounds_D26_ARCADE.csv'
     # fn = 'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv'
     # fn = 'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv'
-    fn = 'GLORIA_-_Croire_D21_ARCADE.csv'
+    # fn = 'GLORIA_-_Croire_D21_ARCADE.csv'
+    fn = 'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv'
     # fn = 'Life_is_PIANO_-_Junk_D21_ARCADE.csv'
     # fn = 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv'
     cs = ChartStruct.from_file(os.path.join(folder, fn))
@@ -408,6 +409,8 @@ if __name__ == '__main__':
     sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
     xs = fter.featurize_sections(sections)
     ft_names = fter.get_feature_names()
+    # can debug with 
+    fter.get_feature_dict(sections[-2])
     # print(xs)
     import code; code.interact(local=dict(globals(), **locals()))
 
