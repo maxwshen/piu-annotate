@@ -16,6 +16,7 @@ from ruptures.base import BaseCost
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats import nps
 from piu_annotate.segment.skills import annotate_skills
+from piu_annotate.formats.nps import calc_effective_downpress_times
 
 
 @dataclass
@@ -68,7 +69,17 @@ def featurize(cs: ChartStruct) -> npt.NDArray:
         '__jack',
         '__footswitch',
     ]
+    
+    # filter to effective downpresses
+    edp_idxs = calc_effective_downpress_times(
+        cs,
+        adjust_for_staggered_brackets = False,
+        return_idxs = True
+    )
+    not_edp_idxs = [i for i in range(len(cs.df)) if i not in edp_idxs]
     skill_fts = np.array(cs.df[skill_cols].astype(int))
+    skill_fts[not_edp_idxs] = 0
+
     x = np.concatenate((nps.reshape(-1, 1), skill_fts), axis = 1)
     # shape: (n_lines, n_fts)
 

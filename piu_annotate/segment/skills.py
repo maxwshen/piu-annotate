@@ -351,7 +351,14 @@ def twists_90(cs: ChartStruct) -> None:
     limb_annots = list(df['Limb annotation'])
 
     res = [False]
-    for i, j in itertools.pairwise(range(len(df))):
+    # i holds the index of the previous line with downpress
+    i = 0
+    for j in range(1, len(df)):
+        if not notelines.has_downpress(lines[j]):
+            res.append(False)
+            continue
+
+        # j has downpress
         is_twist = False
         if 'r' in limb_annots[i] and 'l' in limb_annots[j]:
             leftmost_r_panel = notelines.get_leftmost_rightfoot_panel(
@@ -379,6 +386,9 @@ def twists_90(cs: ChartStruct) -> None:
 
         res.append(is_twist)
 
+        # update i because line had downpress
+        i = j
+
     cs.df['__twist 90'] = res
     return
 
@@ -391,7 +401,18 @@ def twists_over90(cs: ChartStruct) -> None:
     list_is_over90_twist = [False]
     list_is_close_twist = [False]
     list_is_far_twist = [False]
-    for i, j in itertools.pairwise(range(len(df))):
+
+    # i holds the index of the previous line with downpress
+    i = 0
+    for j in range(1, len(df)):
+        if not notelines.has_downpress(lines[j]):
+            list_is_over90_twist.append(False)
+            list_is_close_twist.append(False)
+            list_is_far_twist.append(False)
+            continue
+
+        # j has downpress
+
         is_over90_twist = False
         is_close_twist = False
         is_far_twist = False
@@ -422,6 +443,9 @@ def twists_over90(cs: ChartStruct) -> None:
         list_is_over90_twist.append(is_over90_twist)
         list_is_close_twist.append(is_close_twist)
         list_is_far_twist.append(is_far_twist)
+
+        # update i because line had downpress
+        i = j
 
     cs.df['__twist over90'] = list_is_over90_twist
     cs.df['__twist close'] = list_is_close_twist

@@ -71,18 +71,25 @@ def calc_bpm(time_since: float, display_bpm: float | None) -> tuple[float, str]:
 def calc_effective_downpress_times(
     cs: ChartStruct,
     adjust_for_staggered_brackets: bool = True,
-) -> list[float]:
+    return_idxs: bool = False,
+) -> list[float] | list[int]:
     """ Calculate times of effective downpresses.
         An effective downpress is 1 or 2, where we do not count lines
         with only hold starts if they repeat the previous line, and occur
         soon after the previous line.
 
+    
         Examples:
             1 -> 2 soon after on the same arrow; the 2 is not an effective downpress
             2 -> 3 -> 2 immediately after on same arrow; not an effective downpress
 
-        When `adjust_for_staggered_brackets` is True, remove the second line in
-        a staggered bracket from counting as an effective downpress.
+        When `adjust_for_staggered_brackets` is True, do not consider
+        the second line in a staggered bracket as an effective downpress.
+        If True, when filtering skill annotations down to co-occuring with an effective downpress,
+        then staggered brackets will be filtered out.
+        This option is useful to remove staggered brackets from inflating eNPS.
+
+        If `return_idxs`, then return list of indices. Otherwise, return list of times.
     """
     if adjust_for_staggered_brackets:
         skills.staggered_brackets(cs)
@@ -97,6 +104,7 @@ def calc_effective_downpress_times(
     time_since_prev_dp = list(cs.df['__time since prev downpress'])
 
     edp_times = []
+    edp_idxs = []
     prev_hold_releases = dict()
     for idx in range(len(cs.df)):
         time = times[idx]
@@ -113,6 +121,7 @@ def calc_effective_downpress_times(
              continue
         if idx == 0:
             edp_times.append(time)
+            edp_idxs.append(idx)
         else:
             if notelines.is_hold_start(line):
                 crits = [
@@ -163,7 +172,12 @@ def calc_effective_downpress_times(
                     continue
 
             edp_times.append(time)
-    return edp_times
+            edp_idxs.append(idx)
+
+    if return_idxs:
+        return edp_idxs
+    else:
+        return edp_times
 
 
 def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:

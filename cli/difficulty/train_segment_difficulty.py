@@ -20,6 +20,23 @@ from piu_annotate.segment.segment import Section
 from piu_annotate.segment.segment_breaks import get_segment_metadata
 
 
+def worker(inp_fn: str, feature_type: str) -> dict:
+    cs = ChartStruct.from_file(inp_fn)
+    sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+
+    if feature_type == 'segment':
+        fter = featurizers.DifficultySegmentFeaturizer(cs)
+    else:
+        fter = featurizers.DifficultyStepchartFeaturizer(cs)
+
+    shortname = cs.metadata['shortname']
+    dataset = {}
+    dataset[shortname] = fter.featurize_sections(sections)
+    dataset[f'{shortname}-fullstepchart'] = fter.featurize_full_stepchart()
+    dataset['feature names'] = fter.get_feature_names()
+    return dataset
+
+
 def build_segment_feature_store(feature_type: str) -> dict:
     """ Featurizes segments using segment or stepchart featurization,
         storing into pkl. If pkl already exists, loads from file.
@@ -47,26 +64,47 @@ def build_segment_feature_store(feature_type: str) -> dict:
 
     dataset = dict()
 
-    logger.info(f'Building featurized segments for {feature_type=}...')
-    for cs_file in tqdm(chartstruct_files):
-        inp_fn = os.path.join(cs_folder, cs_file)
-        cs = ChartStruct.from_file(inp_fn)
-        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+    do_parallel = args.setdefault('parallel', True)
+    if not do_parallel:
+        logger.info(f'Building featurized segments for {feature_type=}, serially ...')
+        for cs_file in tqdm(chartstruct_files):
+            inp_fn = os.path.join(cs_folder, cs_file)
 
-        if feature_type == 'segment':
-            fter = featurizers.DifficultySegmentFeaturizer(cs)
-        else:
-            fter = featurizers.DifficultyStepchartFeaturizer(cs)
+            cs = ChartStruct.from_file(inp_fn)
+            sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
 
-        ft_names = fter.get_feature_names()
-        xs = fter.featurize_sections(sections)
+            if feature_type == 'segment':
+                fter = featurizers.DifficultySegmentFeaturizer(cs)
+            else:
+                fter = featurizers.DifficultyStepchartFeaturizer(cs)
 
-        shortname = cs.metadata['shortname']
-        dataset[shortname] = xs
+            ft_names = fter.get_feature_names()
+            xs = fter.featurize_sections(sections)
 
-        dataset[f'{shortname}-fullstepchart'] = fter.featurize_full_stepchart()
+            shortname = cs.metadata['shortname']
+            dataset[shortname] = xs
 
-    dataset['feature names'] = ft_names
+            dataset[f'{shortname}-fullstepchart'] = fter.featurize_full_stepchart()
+
+        dataset['feature names'] = ft_names
+
+    # do parallel
+    elif do_parallel:
+        logger.info(f'Building featurized segments for {feature_type=}, parallelizing ...')
+        inputs = [[os.path.join(cs_folder, cs_file), feature_type]
+                  for cs_file in chartstruct_files]
+        import multiprocessing as mp
+        with mp.Pool(num_processes := 6) as pool:
+            dataset_dicts = pool.starmap(
+                worker,
+                tqdm(inputs, total = len(inputs))
+            )
+
+        # combine into one dataset dict
+        dataset = {}
+        for d in tqdm(dataset_dicts):
+            for k, v in d.items():
+                dataset[k] = v
 
     with open(dataset_fn, 'wb') as f:
         pickle.dump(dataset, f)
@@ -112,7 +150,7 @@ def build_dataset(ft_store_segment: dict, ft_store_stepchart: dict) -> dict:
         cs = ChartStruct.from_file(inp_fn)
         shortname = cs.metadata['shortname']
 
-        # use stepchart featurizer to form x, to use stepchart model to predict y
+        # use stepchart featurizer to form x, to use stepchart model to predict y, on segments
         stepchart_features_segment_xs = ft_store_stepchart[shortname]
         segment_dicts = dmp.predict_segments(
             cs, 

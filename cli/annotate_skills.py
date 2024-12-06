@@ -33,9 +33,10 @@ def main():
 
     debug = args.setdefault('debug', False)
     if debug:
-        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-112624/'
+        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/'
         chartstruct_files = [
-            'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv',
+            'Tales_of_Pumpnia_-_Applesoda_S17_ARCADE.csv',
+            # 'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv',
             # 'Rock_the_house_-_Matduke_D22_INFOBAR_TITLE_ARCADE.csv',
             # 'The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog_-_Doin_D24_ARCADE.csv',
             # 'Mopemope_-_LeaF_D25_ARCADE.csv',
@@ -69,7 +70,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424',
     )
     parser.add_argument(

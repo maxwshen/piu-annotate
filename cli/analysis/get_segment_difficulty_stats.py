@@ -15,6 +15,8 @@ from piu_annotate.segment.skills import annotate_skills
 from piu_annotate.difficulty import featurizers
 from piu_annotate.difficulty.models import DifficultyStepchartModelPredictor, DifficultySegmentModelPredictor
 from cli.difficulty.train_difficulty_predictor import build_full_stepchart_dataset
+from piu_annotate.segment.segment import Section
+
 
 def main():
     # run on folder
@@ -43,7 +45,14 @@ def main():
         dd['chart level'].append(cs.get_chart_level())
         # dd['pred level'].append(pred_level)
         dd['sord'].append(cs.singles_or_doubles())
-        
+
+        sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
+        dd['Time length'].append(sections[-1].end_time)
+        dd['Num sections'].append(len(sections))
+        dd['Mean section length'].append(np.mean([s.time_length() for s in sections]))
+        dd['Shortest section'].append(min(s.time_length() for s in sections))
+        dd['Longest section'].append(max(s.time_length() for s in sections))
+
     df = pd.DataFrame(dd)
     df.to_csv('/home/maxwshen/piu-annotate/artifacts/analysis/segment-difficulty.csv')
     return
