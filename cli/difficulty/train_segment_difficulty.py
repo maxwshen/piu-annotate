@@ -64,6 +64,8 @@ def build_segment_feature_store(feature_type: str) -> dict:
         shortname = cs.metadata['shortname']
         dataset[shortname] = xs
 
+        dataset[f'{shortname}-fullstepchart'] = fter.featurize_full_stepchart()
+
     dataset['feature names'] = ft_names
 
     with open(dataset_fn, 'wb') as f:
@@ -111,8 +113,12 @@ def build_dataset(ft_store_segment: dict, ft_store_stepchart: dict) -> dict:
         shortname = cs.metadata['shortname']
 
         # use stepchart featurizer to form x, to use stepchart model to predict y
-        stepchart_xs = ft_store_stepchart[shortname]        
-        segment_dicts = dmp.predict_segments(cs, stepchart_xs, ft_store_stepchart['feature names'])
+        stepchart_features_segment_xs = ft_store_stepchart[shortname]
+        segment_dicts = dmp.predict_segments(
+            cs, 
+            stepchart_features_segment_xs, 
+            ft_store_stepchart['feature names']
+        )
 
         y = np.array([d['level'] for d in segment_dicts])
 
@@ -126,11 +132,18 @@ def build_dataset(ft_store_segment: dict, ft_store_stepchart: dict) -> dict:
         # subset to cruxes
         segment_xs = ft_store_segment[shortname]
         segment_xs = segment_xs[idxs]
+
         # use chart level as target level
         y = np.array([cs.get_chart_level()] * len(idxs))
 
         all_xs.append(segment_xs)
         all_ys.append(y)
+        singles_or_doubles.append(cs.singles_or_doubles())
+
+        # include featurized full stepchart
+        full_stepchart_x = ft_store_segment[f'{shortname}-fullstepchart']
+        all_xs.append(full_stepchart_x)
+        all_ys.append(np.array([cs.get_chart_level()]))
         singles_or_doubles.append(cs.singles_or_doubles())
 
     logger.info(f'Created dataset with {len(all_xs)=}, {len(all_ys)=}')

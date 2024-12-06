@@ -493,6 +493,8 @@ def jack(cs: ChartStruct) -> None:
     df = cs.df
     lines = cs.get_lines_with_active_holds()
     limb_annots = list(df['Limb annotation'])
+    ts = list(df['__time since prev downpress'])
+    min_nps = 8
 
     res = [False]
     for i, j in itertools.pairwise(range(len(df))):
@@ -500,6 +502,7 @@ def jack(cs: ChartStruct) -> None:
             lines[j] == lines[i],
             notelines.num_downpress(lines[i]) == 1,
             limb_annots[i] == limb_annots[j],
+            ts[j]
         ]
         res.append(all(crits))
 

@@ -48,6 +48,9 @@ def main():
             logger.error(f'Failed to load {inp_fn}')
             sys.exit()
 
+        # if 'Segments' in cs.metadata:
+        #     continue
+        # print(cs_file)
         sections = segmentation(cs, debug = debug)
         cs.metadata['Segments'] = [s.to_tuple() for s in sections]
         cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]

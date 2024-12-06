@@ -209,6 +209,16 @@ class DifficultySegmentFeaturizer:
         sections = [Section.from_tuple(tpl) for tpl in self.cs.metadata['Segments']]
         return list(self.get_feature_dict(sections[0]).keys())
 
+    def featurize_full_stepchart(self) -> npt.NDArray:
+        # make section to represent entire stepchart
+        times = list(self.cs.df['Time'])
+        full_section = Section(0, len(self.cs.df) - 1, times[0], times[-1])
+
+        fts = self.get_feature_dict(full_section)
+        x = np.array(list(fts.values()))
+        x = x.reshape(1, -1)
+        return x
+
     def featurize_sections(self, sections: list[Section]) -> npt.NDArray:
         all_x = []
         for section in sections:
@@ -377,6 +387,9 @@ class DifficultyStepchartFeaturizer:
         fts.update(skill_nps_stats)
         return fts
 
+    """
+        Public methods
+    """
     def get_feature_names(self) -> list[str]:
         return list(self.get_feature_dict().keys())
 
@@ -400,7 +413,8 @@ if __name__ == '__main__':
     # fn = 'X-Rave_-_SHORT_CUT_-_-_DM_Ashura_D18_SHORTCUT.csv'
     # fn = 'Conflict_-_Siromaru_+_Cranky_D25_ARCADE.csv'
     # fn = 'GLORIA_-_Croire_D21_ARCADE.csv'
-    fn = 'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv'
+    fn = 'Amor_Fati_-_Yeon_Ja_Kim_D23_ARCADE.csv'
+    # fn = 'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv'
     # fn = 'Life_is_PIANO_-_Junk_D21_ARCADE.csv'
     # fn = 'Conflict_-_Siromaru_+_Cranky_D21_ARCADE.csv'
     cs = ChartStruct.from_file(os.path.join(folder, fn))

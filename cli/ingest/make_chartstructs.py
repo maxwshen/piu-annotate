@@ -77,6 +77,7 @@ def try_ssc_to_chartstruct(stepchart: StepchartSSC, out_folder: str) -> str:
     out_file = os.path.join(out_folder, basename)
     # if os.path.isfile(out_file):
     #     return 'success'
+    # print(basename)
 
     cs_df, holdticks, cs_message = stepchart_ssc_to_chartstruct(stepchart)
     if cs_message == 'success':
@@ -166,6 +167,7 @@ def main():
     import multiprocessing as mp
     logger.info(f'Converting standard .ssc to chartstruct ...')
     inputs = [[stepchart, out_chartstruct_folder] for stepchart in standard_stepcharts]
+
     with mp.Pool(num_processes := 6) as pool:
         mp_cs_msg = pool.starmap(
             try_ssc_to_chartstruct,
@@ -173,6 +175,7 @@ def main():
         )
     for k, v in Counter(mp_cs_msg).items():
         logger.info(f'{k}: {v}')
+
     # mp_cs_msg = []
     # for input in tqdm(inputs):
     #     try_ssc_to_chartstruct(*input)
@@ -205,7 +208,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--output_chartstruct_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/r0729-ae0728-092124/'
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/'
     )
     args.parse_args(parser)
     main()

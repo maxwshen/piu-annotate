@@ -66,7 +66,10 @@ def main():
             if 'LASTSECONDHINT' in cs.metadata:
                 lastsecondhint = float(cs.metadata['LASTSECONDHINT'])
                 if max(cs.df['Time']) > 400:
-                    logger.debug(f'{cs_file=}')
+                    logger.debug(f'Attempting to clip long chart: {cs_file=}')
+                    logger.debug(f'OK?')
+                    import code; code.interact(local=dict(globals(), **locals()))
+
                     cs.df['Time'] = cs.df['Time'].clip(upper = lastsecondhint)
 
         # annotate which limb annotations are manual

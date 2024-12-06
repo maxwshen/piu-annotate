@@ -50,7 +50,8 @@ class DifficultySegmentModelPredictor:
         xs: npt.NDArray,
         ft_names: list[str],
     ) -> list[dict]:
-        """ Predicts segments featurized into `xs` from ChartStruct `cs`.
+        """ Predict difficulties for segments featurized into `xs`
+            from ChartStruct `cs`.
         """
         sord = cs.singles_or_doubles()
         chart_level = cs.get_chart_level()
@@ -63,6 +64,15 @@ class DifficultySegmentModelPredictor:
 
         # clip
         pred = np.clip(pred, 0.7, 28.3)
+
+        # push higher difficulty predictions towards chart level
+        pred[pred > chart_level] = (pred[pred > chart_level] + chart_level) / 2
+        pred = np.clip(pred, None, chart_level + 3)
+
+        # lift underrated predictions
+        if max(pred) < chart_level:
+            lift = (chart_level - max(pred)) / 2
+            pred[pred > max(pred) - 3] += lift
 
         debug = args.setdefault('debug', False)
 

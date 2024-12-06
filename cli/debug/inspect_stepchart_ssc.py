@@ -61,13 +61,17 @@ if __name__ == '__main__':
         # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1695 - Phalanx RS2018 edit/1695 - Phalanx RS2018 edit.ssc'
         # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/10 - FIESTA 2/(1) 13A2 - [Remix] Infinity RMX/13A2 - [Remix] Infinity RMX.ssc'
         # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/09 - FIESTA EX/1160 - Jonathan\'s Dream/1160 - Jonathan\'s Dream.ssc',
-        default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1698 - Life is PIANO/1698 - Life is PIANO.ssc'
+        # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1698 - Life is PIANO/1698 - Life is PIANO.ssc'
+        # default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/16 - PHOENIX/18120 - Amor Fati/Amor Fati.ssc'
+        default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/14 - XX/1629 - Tales of Pumpnia/1629 - Tales of Pumpnia.ssc'
     )
     parser.add_argument(
         '--description_songtype',
         # default = 'D19_REMIX',
         # default = 'S8_ARCADE',
-        default = 'D21_ARCADE',
+        # default = 'D21_ARCADE',
+        # default = 'D23_ARCADE',
+        default = 'S17_ARCADE',
     )
     args.parse_args(parser)
     main()

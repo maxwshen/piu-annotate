@@ -76,7 +76,7 @@ def stepchart_ssc_to_chartstruct(
         like BPMS, WARPS, DELAYS, STOPS, FAKES into time/beat stamps for lines.
 
         Output df has one row per "line" and 
-        cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Limb annotation'].
+        cols = ['Beat', 'Time', 'Line', 'Line with active holds', 'Comment'].
 
         Output
         ------
@@ -105,6 +105,7 @@ def stepchart_ssc_to_chartstruct(
     for bd in [warps, beat_to_bpm, stops, delays, fakes, holdticks]:
         all_beats += bd.get_event_times()
     beats = sorted(list(set(all_beats)))
+    beats = [b for b in beats if b >= 0]
 
     in_warp = lambda beat: warps.beat_in_any_range(beat, inclusive_end = False)
     in_fake = lambda beat: fakes.beat_in_any_range(beat, inclusive_end = False)
@@ -165,7 +166,6 @@ def stepchart_ssc_to_chartstruct(
                 'Beat': beat,
                 'Line': line_towrite,
                 'Line with active holds': aug_line,
-                'Limb annotation': '',
                 'Comment': comment,
             }
             for k, v in d.items():
@@ -186,7 +186,6 @@ def stepchart_ssc_to_chartstruct(
                     'Beat': beat,
                     'Line': end_hold_aug_line.replace('3', '0'),
                     'Line with active holds': end_hold_aug_line,
-                    'Limb annotation': '',
                     'Comment': comment,
                 }
                 for k, v in d.items():
@@ -248,7 +247,102 @@ def stepchart_ssc_to_chartstruct(
         ht.ticks = round(ht.ticks)
 
     df = pd.DataFrame(dd)
+    df = combine_lines_very_close_in_time(df)
     return df, [ht.to_tuple() for ht in merge_holdticks(hold_tick_list)], 'success'
+
+
+def find_merge_ranges(times: np.ndarray, threshold: float = 1e-4) -> list[tuple[int, int]]:
+    """ Find ranges in `times` that are within `threshold` apart, for merging lines.
+        Returns tuple of start (inclusive) : end (exclusive) indices
+    """
+    merge_ranges = []
+    for i in range(len(times)):
+        merge_idx = np.searchsorted(times, times[i] + threshold)
+        if merge_idx > i + 1:
+            if not merge_ranges or i >= merge_ranges[-1][1]:
+                merge_ranges.append((i, merge_idx))
+    return merge_ranges
+
+
+def merge_rows(df: pd.DataFrame, start: int, end: int) -> dict | None:
+    """ Attempt to merge rows that occur close in time.
+        Does not merge rows that have hold start or releases.
+    """
+    dfs = df.iloc[start : end]
+    lines = list(dfs['Line'])
+    comments = list(dfs['Comment'])
+
+    if any('2' in line or '3' in line for line in lines):
+        return None
+
+    # merge lines
+    merged_line = []
+    for i in range(len(lines[0])):
+        chars = [line[i] for line in lines]
+        active_symbols = [c for c in chars if c != '0']
+        if len(active_symbols) == 1:
+            merged_line.append(active_symbols[0])
+        else:
+            merged_line.append('0')
+    merged_line = ''.join(merged_line)
+
+    # merge line with active holds
+    merged_line_ah = []
+    for i in range(len(lines[0])):
+        chars = [line[i] for line in lines]
+        if '1' in chars:
+            merged_line_ah.append('1')
+        elif '4' in chars:
+            if not all(c == '4' for c in chars):
+                return None
+            merged_line_ah.append('4')
+        else:
+            merged_line_ah.append('0')
+    merged_line_ah = ''.join(merged_line_ah)
+
+    d = {
+        'Time': min(dfs['Time']),
+        'Beat': min(dfs['Beat']),
+        'Line': merged_line,
+        'Line with active holds': merged_line_ah,
+        'Comment': ';'.join([comments[0], 'mergedlines']),
+    }
+    assert all(col in d for col in df.columns)
+    return d
+
+
+def combine_lines_very_close_in_time(df: pd.DataFrame) -> pd.DataFrame:
+    """ Merge lines that are very close together in time, like 1e-8 seconds difference.
+        These lines modify scoring, e.g., on quad jumps on amor fati d23.
+        Notating a quad jump arrows on separate lines means partial credit is possible,
+        while a quad jump on the same line means no partial credit.
+        However, for purposes of limb prediction, difficulty prediction,
+        visualization, etc., we prefer to combine these lines into one line.
+    """
+    merge_ranges = find_merge_ranges(np.array(df['Time']), threshold = 1e-4)
+    i = 0
+    new_dd = defaultdict(list)
+    while i < len(df):
+        if len(merge_ranges) > 0 and i == merge_ranges[0][0]:
+            start, end = merge_ranges.pop(0)
+
+            merged_dict = merge_rows(df, start, end)
+
+            if merged_dict is not None:
+                for k, v in merged_dict.items():
+                    new_dd[k].append(v)
+            else:
+                for j in range(start, end):
+                    for k, v in dict(df.iloc[j]).items():
+                        new_dd[k].append(v)
+            i = end
+        else:
+            for k, v in dict(df.iloc[i]).items():
+                new_dd[k].append(v)
+            i += 1
+
+    new_df = pd.DataFrame(new_dd)
+    return new_df
 
 
 class BeatToLines:
