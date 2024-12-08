@@ -154,24 +154,35 @@ def annotate_segment_similarity():
         cs = ChartStruct.from_file(inp_fn)
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
         shortname = cs.metadata['shortname']
+        chart_level = cs.get_chart_level()
 
         assert 'Segment metadata' in cs.metadata, 'Expected segment metadata dicts to already be created'
         meta_dicts = cs.metadata['Segment metadata']
         # one dict per section
+        segment_pred_levels = [meta_dicts[i]['level'] for i in range(len(meta_dicts))]
+        max_segment_pred_level = max(segment_pred_levels)
 
         for section_idx in range(len(sections)):
-            closest_sections = ss.find_closest(
-                shortname, 
-                section_idx,
-            )
+            segment_pred_level = segment_pred_levels[section_idx]
+            closest_sections = []
 
-            # if no sections are found, try with increased level threshold
-            if len(closest_sections) == 0:
+            # skip similar sections for very easy segments
+            crits = [
+                segment_pred_level >= max_segment_pred_level - 4,
+                segment_pred_level >= chart_level - 4
+            ]
+            if any(crits):
                 closest_sections = ss.find_closest(
                     shortname, 
                     section_idx,
-                    level_threshold = 3,
                 )
+                # if no sections are found, try with increased level threshold
+                if len(closest_sections) == 0:
+                    closest_sections = ss.find_closest(
+                        shortname, 
+                        section_idx,
+                        level_threshold = 3,
+                    )
 
             # convert to url safe
             urlsafe_sections = [

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from loguru import logger
 import math
+import numpy as np
 
 if TYPE_CHECKING:
     from piu_annotate.formats.chart import ChartStruct
@@ -23,7 +24,7 @@ class ArrowArt:
         assert self.limb in set(list('lreh?'))
 
     def to_tuple(self) -> list:
-        return (self.arrow_pos, self.time, self.limb)
+        return (self.arrow_pos, np.round(self.time, decimals = 4), self.limb)
 
     @staticmethod
     def from_tuple(tpl: tuple[int, float, str]):
@@ -50,7 +51,12 @@ class HoldArt:
         assert self.limb in set(list('lreh?'))
 
     def to_tuple(self) -> list:
-        return (self.arrow_pos, self.start_time, self.end_time, self.limb)
+        return (
+            self.arrow_pos, 
+            np.round(self.start_time, decimals = 4), 
+            np.round(self.end_time, decimals = 4), 
+            self.limb
+        )
 
     @staticmethod
     def from_tuple(tpl: tuple[int, float, float, str]):

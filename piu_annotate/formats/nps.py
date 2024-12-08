@@ -240,6 +240,8 @@ def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
                         all_nps.append(nps)
                         annot_times.append(edp_times[i])
 
+    annot_times = [np.round(t, decimal = 4) for t in annot_times]
+
     return list(zip(annot_times, annots))
 
 

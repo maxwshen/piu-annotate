@@ -29,7 +29,11 @@ class HoldTick:
         return f'{self.to_tuple()}'
 
     def to_tuple(self) -> tuple[float, float, float]:
-        return (self.start_time, self.end_time, self.ticks)
+        return (
+            np.round(self.start_time, decimals = 4), 
+            np.round(self.end_time, decimals = 4), 
+            self.ticks
+        )
 
     def hold_length(self) -> float:
         return self.end_time - self.start_time
