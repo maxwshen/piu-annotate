@@ -26,12 +26,15 @@ def calc_nps(bpm: float, note_type: int = 4) -> float:
     return nps
 
 
-def calc_bpm(time_since: float, display_bpm: float | None) -> tuple[float, str]:
+def calc_bpm(
+    time_since: float, 
+    display_bpm: float | None,
+    allowed_notetypes: list[int] = [1, 2, 4, 8, 12, 16, 24, 32],
+) -> tuple[float, str]:
     """ From `time_since`, finds which notetype (quarter, 8th, etc.) 
         at which bpm, favoring the bpm closest to `display_bpm`.
         Returns (bpm, note_type)
     """
-    allowed_notetypes = [1, 2, 4, 8, 12, 16, 24, 32]
     note_type_to_str = {
         1: 'Whole notes',
         2: 'Half notes',

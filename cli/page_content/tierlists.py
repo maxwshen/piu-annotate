@@ -17,6 +17,7 @@ from piu_annotate.utils import make_basename_url_safe
 from cli.difficulty.train_segment_difficulty import build_segment_feature_store
 from piu_annotate.difficulty.models import DifficultyStepchartModelPredictor
 from piu_annotate import utils
+from piu_annotate.formats.nps import calc_bpm
 
 
 def make_data_struct():
@@ -35,6 +36,7 @@ def make_data_struct():
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
     ft_store = build_segment_feature_store('stepchart')
+    segment_ft_store = build_segment_feature_store('segment')
 
     # Load models
     dmp = DifficultyStepchartModelPredictor()
@@ -61,6 +63,10 @@ def make_data_struct():
         dd['Shortname'].append(shortname)
         dd['sord-level'].append(f'{sord[0].upper()}{cs.get_chart_level()}')
 
+        dd['enps-95th-pct'].append(
+            np.percentile(cs.metadata['eNPS timeline data'], 95)
+        )
+
         edp2 = x[0][ft_names.index('edp-2')]
         dd['edp-2'].append(edp2)
 
@@ -68,6 +74,24 @@ def make_data_struct():
         pickle.dump(dd, f)
     logger.info(f'Saved dataset to {dataset_fn}')
     return dd
+
+
+def get_notetype_and_bpm_info(nps: float):
+    # get allowed note type
+    if nps < 0.8333:
+        allowed_notetype = [1]
+    elif nps < 1.666:
+        allowed_notetype = [2]
+    elif nps < 3.333:
+        allowed_notetype = [4]
+    elif nps < 6.666:
+        allowed_notetype = [8]
+    else:
+        allowed_notetype = [16]
+
+    bpm, notetype = calc_bpm(1 / nps, None, allowed_notetypes = allowed_notetype)
+    return f'{notetype} @ {round(bpm)} bpm'
+
 
 def main():
     cs_folder = args['chart_struct_csv_folder']
@@ -81,7 +105,8 @@ def main():
     tierlist_struct = dict()
     for sordlevel in sorted(set(dd['sord-level'])):
         idxs = [i for i, sdl in enumerate(dd['sord-level']) if sdl == sordlevel]
-        edps = np.array(dd['edp-2'])[idxs]
+        # edps = np.array(dd['edp-2'])[idxs]
+        edps = np.array(dd['enps-95th-pct'])[idxs]
         charts = np.array(dd['Shortname'])[idxs]
         pred_levels = np.array(dd['pred-level'])[idxs]
         num_charts = len(idxs)
@@ -102,7 +127,10 @@ def main():
 
         edp_percentiles.insert(0, min(edps))
         edp_percentiles.append(max(edps) + 0.1)
-        edp_percentiles = [np.round(x, 2) for x in edp_percentiles]
+        def floor_to_decimal_pts(a: float) -> float:
+            n_decimals = 2
+            return ((a*10**n_decimals)//1)/(10**n_decimals)
+        edp_percentiles = [floor_to_decimal_pts(x) for x in edp_percentiles]
 
         # place charts into groups
         groups = dict()
@@ -117,22 +145,26 @@ def main():
             sorted_charts = sorted(chart_to_level, key = chart_to_level.get, reverse = True)
             sorted_levels = [chart_to_level[c] for c in sorted_charts]
 
+            # get note type and BPM info
+            lower_notetype_bpm = get_notetype_and_bpm_info(lower)
+            upper_notetype_bpm = get_notetype_and_bpm_info(upper)
+
             if upper != edp_percentiles[-1]:
-                name = f'{lower}-{upper} NPS'
+                name = f'{lower}-{upper} NPS\n{lower_notetype_bpm} - {upper_notetype_bpm}'
             else:
-                name = f'{lower}+ NPS'
+                name = f'{lower}+ NPS\n>{lower_notetype_bpm}'
             
             if len(sorted_charts) > 0:
                 groups[name] = (sorted_charts, sorted_levels)
 
         tierlist_struct[sordlevel] = groups
+        print(sordlevel, groups.keys())
         # for k, v in groups.items():
             # print(k, v)
 
     with open(output_file, 'w') as f:
         json.dump(tierlist_struct, f)
     import code; code.interact(local=dict(globals(), **locals()))
-
 
     logger.success('done')
     return
