@@ -152,7 +152,7 @@ def main():
             if upper != edp_percentiles[-1]:
                 name = f'{lower}-{upper} NPS\n{lower_notetype_bpm} - {upper_notetype_bpm}'
             else:
-                name = f'{lower}+ NPS\n>{lower_notetype_bpm}'
+                name = f'{lower}+ NPS\n{lower_notetype_bpm}+'
             
             if len(sorted_charts) > 0:
                 groups[name] = (sorted_charts, sorted_levels)

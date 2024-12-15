@@ -500,6 +500,7 @@ def mid6_doubles(cs: ChartStruct) -> None:
 
 
 def splits(cs: ChartStruct) -> None:
+    # 12/14/24 -- this implementation is wrong, haven't fixed it yet
     df = cs.df
     lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
 
@@ -651,6 +652,10 @@ def annotate_skills(cs: ChartStruct) -> None:
     cs.df['__bracket drill'] = cs.df['__bracket'] & cs.df['__drill']
     cs.df['__bracket jump'] = cs.df['__bracket'] & cs.df['__jump']
     cs.df['__bracket twist'] = cs.df['__bracket'] & (
+        cs.df['__twist 90'] | cs.df['__twist over90']
+    )
+
+    cs.df['__run without twists'] = cs.df['__run'] & ~(
         cs.df['__twist 90'] | cs.df['__twist over90']
     )
 
