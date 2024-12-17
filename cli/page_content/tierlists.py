@@ -164,7 +164,6 @@ def main():
 
     with open(output_file, 'w') as f:
         json.dump(tierlist_struct, f)
-    import code; code.interact(local=dict(globals(), **locals()))
 
     logger.success('done')
     return

@@ -36,8 +36,9 @@ def main():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/'
         chartstruct_files = [
+            'Gargoyle_-_FULL_SONG_-_-_Sanxion7_D25_FULLSONG.csv',
             # 'The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
-            'Altale_-_sakuzyo_D19_ARCADE.csv',
+            # 'Altale_-_sakuzyo_D19_ARCADE.csv',
         ]
         chartstruct_files = [folder + f for f in chartstruct_files]
 

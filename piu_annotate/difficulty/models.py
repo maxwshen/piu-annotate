@@ -86,12 +86,14 @@ class DifficultySegmentModelPredictor:
             'bracket drill-5': 96,
             'bracket jump-5': 96,
             'bracket twist-5': 96,
+            'split-2': 96,
+            'hold footswitch-2': 96,
         }
         # only use doublestep as rare skill for manually annotated stepcharts,
         # because doublestep is a common error for predicted limb annotations,
         # especially on chart sections with holds and taps
         if cs.metadata['Manual limb annotation']:
-            rare_skill_cands['doublestep-7'] = 99
+            rare_skill_cands['doublestep-7'] = 98
 
         stepchart_data = self.stepchart_dataset['x']
         stepchart_levels = self.stepchart_dataset['y']
@@ -103,6 +105,7 @@ class DifficultySegmentModelPredictor:
                 stepchart_data[stepchart_levels <= chart_level, ft_idx], 
                 percentile_threshold
             )
+            assert xs.shape[-1] == stepchart_data.shape[-1], 'Thresholds are computed from featurized stepcharts, so featurized stepchart needs to match dimension of featurized segment'
             rare_skill_idxs = xs[:, ft_idx] > threshold
             if rare_skill_idxs.any():
                 for i in np.where(rare_skill_idxs)[0]:

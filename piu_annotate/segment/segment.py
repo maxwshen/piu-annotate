@@ -139,8 +139,8 @@ class Segmenter:
             Places heavier penalty on short sections, so errs 
             towards longer segments.
         """
-        # ~ 1 segment per 15 seconds is roughly good
-        ideal_num_segments = self.chart_time_len / 15
+        # ~ 1 segment per 15 seconds is roughly good, up to 15 seconds (3.75 min)
+        ideal_num_segments = max(15, self.chart_time_len / 15)
         num_cost = (len(changepoints) - ideal_num_segments) ** 2
 
         sections = [0] + changepoints[:-1] + [len(self.cs.df) - 1]

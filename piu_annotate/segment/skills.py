@@ -500,17 +500,58 @@ def mid6_doubles(cs: ChartStruct) -> None:
 
 
 def splits(cs: ChartStruct) -> None:
-    # 12/14/24 -- this implementation is wrong, haven't fixed it yet
     df = cs.df
     lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
+    ts = list(df['__time since prev downpress'])
+
+    if cs.singles_or_doubles() == 'singles':
+        cs.df['__split'] = [False] * len(cs.df)
+        return
 
     def has_split(line: str) -> bool:
         return all([
             any(x in line[:2] for x in list('12')),
             any(x in line[-2:] for x in list('12')),
         ])
+    # start with splits in any single line
+    res = [has_split(line) for line in lines]
 
-    cs.df['__split'] = [has_split(line) for line in lines]
+    # consider splits in consecutive downpress lines
+    i = 0
+    for j in range(1, len(df)):
+        if not notelines.has_downpress(lines[j]):
+            continue
+        # j has downpress
+
+        is_split = False
+
+        # if j and prev downpress line (i) are splits
+        # i on right, j on left
+        if all([
+            any(x in lines[i][:2] for x in list('12')),
+            any(x in lines[j][-2:] for x in list('12')),
+            ts[j] < 0.5,
+            notelines.num_downpress(lines[i]) == 1,
+            notelines.num_downpress(lines[j]) == 1,
+        ]):
+            is_split = True
+
+        # i on left, j on right
+        if all([
+            any(x in lines[j][:2] for x in list('12')),
+            any(x in lines[i][-2:] for x in list('12')),
+            ts[j] < 0.5,
+            notelines.num_downpress(lines[i]) == 1,
+            notelines.num_downpress(lines[j]) == 1,
+        ]):
+            is_split = True
+
+        res[j] |= is_split
+
+        # update i because line had downpress
+        i = j
+
+    cs.df['__split'] = res
     return
 
 
@@ -550,6 +591,15 @@ def footswitch(cs: ChartStruct) -> None:
         res.append(all(crits))
 
     cs.df['__footswitch'] = res
+    return
+
+
+def hold_footswitch(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = cs.get_lines_with_active_holds()
+    limb_annots = list(df['Limb annotation'])
+
+    cs.df['__hold footswitch'] = ['e' in la for line, la in zip(lines, limb_annots)]
     return
 
 
@@ -642,6 +692,7 @@ def annotate_skills(cs: ChartStruct) -> None:
     mid4_doubles(cs)
     mid6_doubles(cs)
     splits(cs)
+    hold_footswitch(cs)
 
     jump(cs)
     twists_90(cs)
@@ -654,7 +705,6 @@ def annotate_skills(cs: ChartStruct) -> None:
     cs.df['__bracket twist'] = cs.df['__bracket'] & (
         cs.df['__twist 90'] | cs.df['__twist over90']
     )
-
     cs.df['__run without twists'] = cs.df['__run'] & ~(
         cs.df['__twist 90'] | cs.df['__twist over90']
     )

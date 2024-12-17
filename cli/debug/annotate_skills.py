@@ -35,7 +35,9 @@ def main():
     if debug:
         folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/'
         chartstruct_files = [
-            'Tales_of_Pumpnia_-_Applesoda_S17_ARCADE.csv',
+            'WI-EX-DOC-VA_-_YAHPP_D24_INFOBAR_TITLE_REMIX.csv',
+            'Altale_-_sakuzyo_D23_ARCADE.csv',
+            # 'Tales_of_Pumpnia_-_Applesoda_S17_ARCADE.csv',
             # 'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv',
             # 'Rock_the_house_-_Matduke_D22_INFOBAR_TITLE_ARCADE.csv',
             # 'The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog_-_Doin_D24_ARCADE.csv',

@@ -43,7 +43,8 @@ skill_cols_to_description = {
     '__bracket drill': 'These identify brackets that occur in drills.',
     '__bracket jump': 'Bracket jumps are jumps that involve brackets.',
     '__bracket twist': 'Bracket twists are lines that executed by bracketing and twisting at the same time.',
-    # '__split',
+    '__split': 'Splits are a doubles-only pattern that require hitting arrows on the far side panels. These can present a unique challenge to short players.',
+    '__hold footswitch': 'A rare pattern that requires switching the foot used on a hold.',
     '__hands': 'Rare patterns can require the use of feet and hands together.',
 }
 skill_cols = list(skill_cols_to_description.keys())
@@ -75,14 +76,15 @@ def make_skills_dataframe():
         shortname = cs.metadata['shortname']
         sord = cs.singles_or_doubles()
 
-        annotate_skills(cs)
-
-        for skill_col in skill_cols:
-            dd[renamed_skill_cols[skill_col]].append(cs.df[skill_col].mean())
-
         dd['shortname'].append(make_basename_url_safe(shortname))
         dd['sord'].append(sord)
         dd['chart level'].append(cs.get_chart_level())
+
+        annotate_skills(cs)
+        for skill_col in skill_cols:
+            dd[renamed_skill_cols[skill_col]].append(cs.df[skill_col].mean())
+
+        # annotate other attributes, like metrics for sustained vs bursty
     
     df = pd.DataFrame(dd)
 
@@ -137,6 +139,7 @@ def main():
 
     with open(output_file, 'w') as f:
         json.dump((skill_dict, skill_descriptions), f)
+    logger.info(f'Wrote to {output_file}')
 
     logger.success('done')
     return

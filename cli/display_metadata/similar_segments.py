@@ -169,7 +169,8 @@ def annotate_segment_similarity():
             # skip similar sections for very easy segments
             crits = [
                 segment_pred_level >= max_segment_pred_level - 4,
-                segment_pred_level >= chart_level - 4
+                segment_pred_level >= chart_level - 4,
+                len(meta_dicts[section_idx]['rare skills']) > 0,
             ]
             if any(crits):
                 closest_sections = ss.find_closest(

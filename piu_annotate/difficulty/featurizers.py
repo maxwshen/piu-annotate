@@ -74,6 +74,8 @@ class DifficultySegmentFeaturizer:
             'bracket drill': times[cs.df['__bracket drill']],
             'bracket jump': times[cs.df['__bracket jump']],
             'bracket twist': times[cs.df['__bracket twist']],
+            'split': times[cs.df['__split']],
+            'hold footswitch': times[cs.df['__hold footswitch']],
         }
         # reduce to event times for effective downpresses
         for k in event_times:
@@ -286,6 +288,8 @@ class DifficultyStepchartFeaturizer:
             'bracket drill': times[cs.df['__bracket drill']],
             'bracket jump': times[cs.df['__bracket jump']],
             'bracket twist': times[cs.df['__bracket twist']],
+            'split': times[cs.df['__split']],
+            'hold footswitch': times[cs.df['__hold footswitch']],
         }
         # reduce to event times for effective downpresses
         for k in event_times:
