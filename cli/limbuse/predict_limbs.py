@@ -61,6 +61,8 @@ def main():
     # for csv in tqdm(csv_sord):
     csvs = csv_sord
 
+    rerun_manual = args.setdefault('rerun_manual', False)
+
     time_profile_mode = args.setdefault('time_profile', False)
     if time_profile_mode:
         csvs = csvs[:10]
@@ -71,12 +73,13 @@ def main():
             continue
 
         out_fn = os.path.join(out_dir, os.path.basename(csv))
-        if os.path.isfile(out_fn) and not time_profile_mode:
-            stats['Skipped because outfile exists'] += 1
-            continue
 
         manually_annotated = False
         if csv in cs_to_manual:
+            if os.path.isfile(out_fn) and not time_profile_mode and not rerun_manual:
+                stats['Skipped because outfile exists'] += 1
+                continue
+
             # if existing manual, load that json, and update cs with json
             # logger.info(f'updating with manual - {csv}')
             manual_json = cs_to_manual[csv]
@@ -86,6 +89,10 @@ def main():
             manually_annotated = True
 
         else:
+            if os.path.isfile(out_fn) and not time_profile_mode:
+                stats['Skipped because outfile exists'] += 1
+                continue
+
             # logger.debug(f'predicting - {csv}')
             cs, fcs, pred_limbs = predict(cs, model_suite)
         

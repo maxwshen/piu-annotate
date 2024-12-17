@@ -159,25 +159,12 @@ def num_pressed(line: str) -> int:
     return sum(line.count(x) for x in list('124'))
 
 
-def has_notes(line: str) -> bool:
-    if '`' in line:
-        return bool(set(line) != set(['`0']))
-    else:
-        return bool(set(line) != set(['0']))
-
-
 def is_hold_release(line: str) -> bool:
-    if '`' in line:
-        return bool(set(line) == set(['`03']))
-    else:
-        return bool(set(line) == set(['03']))
+    return bool(set(line.replace('`', '')) == set(list('03')))
 
 
 def is_hold_start(line: str) -> bool:
-    if '`' in line:
-        return bool(set(line) == set(['`02']))
-    else:
-        return bool(set(line) == set(['02']))
+    return bool(set(line.replace('`', '')) == set(list('02')))
 
 
 def has_active_hold(line: str) -> bool:

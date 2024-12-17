@@ -126,14 +126,14 @@ def calc_effective_downpress_times(
             edp_times.append(time)
             edp_idxs.append(idx)
         else:
-            if notelines.is_hold_start(line):
-                crits = [
-                    repeats_prev_dp_idx[idx],
-                    time_since_prev_dp[idx] < HOLD_TIME_THRESHOLD
-                ]
-                if all(crits):
-                    # hold repeats prev downpresses, and occurs soon after - skip
-                    continue
+            crits = [
+                notelines.is_hold_start(line),
+                repeats_prev_dp_idx[idx],
+                time_since_prev_dp[idx] < HOLD_TIME_THRESHOLD
+            ]
+            if all(crits):
+                # hold repeats prev downpresses, and occurs soon after - skip
+                continue
 
             if '1' not in line and '2' in line:
                 # ok if 3 is in line too
@@ -243,7 +243,7 @@ def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
                         all_nps.append(nps)
                         annot_times.append(edp_times[i])
 
-    annot_times = [np.round(t, decimal = 4) for t in annot_times]
+    annot_times = [np.round(t, decimals = 4) for t in annot_times]
 
     return list(zip(annot_times, annots))
 

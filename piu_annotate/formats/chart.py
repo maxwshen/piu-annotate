@@ -496,11 +496,12 @@ class ChartStruct:
         """ Finds df row idx by query_time """
         rounded_time = self.__get_rounded_time()
         q_time = np.round(query_time, decimals = 4)
-        idxs = [i for i, t in enumerate(rounded_time) if math.isclose(q_time, t)]
+        idxs = [i for i, t in enumerate(rounded_time) if math.isclose(q_time, t, abs_tol = 1.1e-4)]
         if len(idxs) > 1:
             pass
         elif len(idxs) == 0:
             logger.error(f'... failed to match lines at {query_time=}')
+            import code; code.interact(local=dict(globals(), **locals()))
         return idxs
 
     """

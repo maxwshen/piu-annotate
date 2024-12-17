@@ -140,12 +140,13 @@ def annotate_enps_timeline():
     debug = args.setdefault('debug', False)
     if debug:
         chartstruct_files = [
-            'Your_Mind_-_Roy_Mikelate_D23_ARCADE.csv',
-            'Ultimatum_-_Cosmograph_S21_ARCADE.csv',
-            'STEP_-_SID-SOUND_D20_ARCADE.csv',
-            'CO5M1C_R4ILR0AD_-_kanone_D22_ARCADE.csv',
-            'GLORIA_-_Croire_D21_ARCADE.csv',
-            'Wedding_Crashers_-_SHK_D23_ARCADE.csv',
+            'Clematis_Rapsodia_-_Jehezukiel_D23_ARCADE.csv',
+            # 'Your_Mind_-_Roy_Mikelate_D23_ARCADE.csv',
+            # 'Ultimatum_-_Cosmograph_S21_ARCADE.csv',
+            # 'STEP_-_SID-SOUND_D20_ARCADE.csv',
+            # 'CO5M1C_R4ILR0AD_-_kanone_D22_ARCADE.csv',
+            # 'GLORIA_-_Croire_D21_ARCADE.csv',
+            # 'Wedding_Crashers_-_SHK_D23_ARCADE.csv',
             # 'Final_Audition_2__-_SHORT_CUT_-_-_Banya_S17_SHORTCUT.csv',
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
