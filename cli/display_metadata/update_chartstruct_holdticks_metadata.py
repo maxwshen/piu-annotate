@@ -47,6 +47,9 @@ def main():
             logger.error(f'Failed to load {inp_fn}')
             sys.exit()
 
+        # annotate chart level
+        cs.metadata['sord_chartlevel'] = cs.get_sord_chartlevel()
+
         # update hold tick counts
         if args.setdefault('holdticks', False) or rerun_all:
             source_ssc = cs.metadata['ssc_file']

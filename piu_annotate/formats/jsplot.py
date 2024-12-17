@@ -33,7 +33,10 @@ class ArrowArt:
     def matches(self, other: ArrowArt, with_limb_annot: bool) -> bool:
         return all([
             self.arrow_pos == other.arrow_pos,
-            math.isclose(self.time, other.time),
+            math.isclose(
+                np.round(self.time, decimals = 4), 
+                np.round(other.time, decimals = 4)
+            ),
             self.limb == other.limb if with_limb_annot else True,
         ])
 
@@ -65,8 +68,14 @@ class HoldArt:
     def matches(self, other: HoldArt, with_limb_annot: bool) -> bool:
         return all([
             self.arrow_pos == other.arrow_pos,
-            math.isclose(self.start_time, other.start_time),
-            math.isclose(self.end_time, other.end_time),
+            math.isclose(
+                np.round(self.start_time, decimals = 4), 
+                np.round(other.start_time, decimals = 4)
+            ),
+            math.isclose(
+                np.round(self.end_time, decimals = 4), 
+                np.round(other.end_time, decimals = 4)
+            ),
             self.limb == other.limb if with_limb_annot else True,
         ])
 
@@ -102,9 +111,9 @@ class ChartJsStruct:
         is_match = all(aas_match) and all(has_match)
         if not is_match:
             pass
-            # print([i for i, flag in enumerate(aas_match) if not flag])
-            # print([i for i, flag in enumerate(has_match) if not flag])
-            # import code; code.interact(local=dict(globals(), **locals()))
+            print([i for i, flag in enumerate(aas_match) if not flag])
+            print([i for i, flag in enumerate(has_match) if not flag])
+            import code; code.interact(local=dict(globals(), **locals()))
         return is_match
 
     @staticmethod

@@ -25,13 +25,15 @@ def main():
     print(len(chart_jsons))
     logger.info(f'Found {len(chart_jsons)} in {chart_json_folder=}')
 
+    rerun = args.setdefault('rerun', False)
+
     failures = []
     success = 0
     for chart_json_basename in tqdm(chart_jsons):
         chart_json_file = os.path.join(chart_json_folder, chart_json_basename)
         chart_csv_file = chart_json_basename.replace('.json', '.csv')
         out_fn = os.path.join(output_folder, chart_csv_file)
-        if os.path.isfile(out_fn):
+        if os.path.isfile(out_fn) and not rerun:
             if os.path.getmtime(out_fn) > os.path.getmtime(chart_json_file):
                 continue
 

@@ -186,6 +186,10 @@ class ChartStruct:
             logger.warning(f'Failed to parse chart level')
             return -1
 
+    def get_sord_chartlevel(self) -> str:
+        """ Outputs 'S20' / 'D7' etc. """
+        return f'{self.singles_or_doubles()[0].upper()}{self.get_chart_level()}'
+
     @functools.lru_cache
     def get_lines(self) -> list[str]:
         """ Return list of line strings, with ` removed """
@@ -484,12 +488,19 @@ class ChartStruct:
     """
         Search
     """
+    @functools.lru_cache
+    def __get_rounded_time(self) -> list[float]:
+        return [np.round(t, decimals = 4) for t in self.df['Time']]
+
     def __time_to_df_idx(self, query_time: float) -> list[int]:
         """ Finds df row idx by query_time """
-        index = self.df.index[self.df['Time'].apply(lambda t: math.isclose(query_time, t))]
-        idxs = index.to_list()
+        rounded_time = self.__get_rounded_time()
+        q_time = np.round(query_time, decimals = 4)
+        idxs = [i for i, t in enumerate(rounded_time) if math.isclose(q_time, t)]
         if len(idxs) > 1:
-            logger.warning(f'... matched multiple lines at {query_time=}')
+            pass
+        elif len(idxs) == 0:
+            logger.error(f'... failed to match lines at {query_time=}')
         return idxs
 
     """
@@ -536,7 +547,9 @@ class ChartStruct:
             num_arrow_arts_updated += n_updates_made
             if n_updates_made > 1:
                 logger.warning(f'Used one arrow art to update multiple lines')
-        
+            if n_updates_made == 0:
+                logger.warning(f'Failed to update any lines')
+
         if verbose:
             logger.info(f'Updated {num_arrow_arts_updated} arrows with limb annotations')
 
