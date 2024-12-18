@@ -181,7 +181,7 @@ class DifficultySegmentFeaturizer:
         """
         event_times = self.get_event_times()
 
-        filt_times = lambda ts: ts[(ts >= section.start_time) & (ts < section.end_time)]
+        filt_times = lambda ts: ts[(ts >= section.start_time) & (ts <= section.end_time)]
         # trim event times to specific section
         for k in event_times:
             event_times[k] = filt_times(event_times[k])

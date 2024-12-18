@@ -74,6 +74,7 @@ def annotate_segments(dataset: dict):
 
     if args.setdefault('debug', False):
         chartstruct_files = [
+            'Winter_-_BanYa_D21_ARCADE.csv',
             'Sudden_Appearance_Image_-_Blacklolita_D23_ARCADE.csv',
             'Conflict_-_Siromaru_+_Cranky_S6_ARCADE.csv',
             # 'Phantom_-Intermezzo-_-_Banya_Production_S7_ARCADE.csv',

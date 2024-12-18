@@ -46,6 +46,8 @@ skill_cols_to_description = {
     '__split': 'Splits are a doubles-only pattern that require hitting arrows on the far side panels. These can present a unique challenge to short players.',
     '__hold footswitch': 'A rare pattern that requires switching the foot used on a hold.',
     '__hands': 'Rare patterns can require the use of feet and hands together.',
+    '__bursty': 'The notes per second in these stepcharts have high variation over time. This is opposite of sustained charts, which have consistent NPS over time.',
+    '__sustained': 'The notes per second in these stepcharts have low variation over time. This is opposite of bursty charts.'
 }
 skill_cols = list(skill_cols_to_description.keys())
 renamed_skill_cols = {skill_col: skill_col.replace('__', '').replace(' ', '_')
@@ -82,9 +84,14 @@ def make_skills_dataframe():
 
         annotate_skills(cs)
         for skill_col in skill_cols:
-            dd[renamed_skill_cols[skill_col]].append(cs.df[skill_col].mean())
+            if skill_col in cs.df.columns:
+                dd[renamed_skill_cols[skill_col]].append(cs.df[skill_col].mean())
 
-        # annotate other attributes, like metrics for sustained vs bursty
+        # annotate other attributes using stepchart-level statistics, like sustained vs bursty
+        enps_data = np.array(cs.metadata['eNPS timeline data'])
+        bursty_score = sum(np.power(enps_data[1:] - enps_data[:-1], 2)) / len(enps_data)
+        dd[renamed_skill_cols['__bursty']].append(bursty_score)
+        dd[renamed_skill_cols['__sustained']].append(1000 - bursty_score)
     
     df = pd.DataFrame(dd)
 
