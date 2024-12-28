@@ -70,6 +70,12 @@ class ArrowEclipseChartInfo:
     def __repr__(self) -> str:
         return '\n'.join(f'{k}: {v}' for k, v in self.data.items())
 
+    def shortname(self) -> str:
+        return ' '.join([
+            self.data['song']['name'],
+            self.data['song']['type'],
+            self.data['shorthand'],
+        ])
 
 class ArrowEclipseStepchartListJson:
     def __init__(self, json_file: str):

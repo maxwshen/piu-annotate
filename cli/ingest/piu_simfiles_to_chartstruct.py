@@ -61,7 +61,9 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description = """
-            Crawls PIU-Simfiles folder
+            Crawls PIU-Simfiles folder, converts .ssc to ChartStructs.
+            Does not have meaningful filters to limit to Phoenix-accessible
+            stepcharts only.
         """
     )
     parser.add_argument(

@@ -9,6 +9,7 @@ from tqdm import tqdm
 import pandas as pd
 from collections import defaultdict, Counter
 import difflib
+import yaml
 
 from piu_annotate.formats.arroweclipse import ArrowEclipseStepchartListJson, ArrowEclipseChartInfo
 from piu_annotate.formats.sscfile import SongSSC, StepchartSSC
@@ -23,6 +24,10 @@ def allowed_multimatch(ae_ci: ArrowEclipseChartInfo) -> bool:
         'Baroque Virus - FULL SONG -': {
             'level': 23,
             'type': 'Double',
+        },
+        'Gargoyle - FULL SONG -': {
+            'level': 21,
+            'type': 'Single',
         }
     }
     def match_dict(query: dict, target: dict):
@@ -49,7 +54,12 @@ def match_aeci_to_ssc(
     ae_ci: ArrowEclipseChartInfo, 
     song_name_to_stepcharts: dict[str, StepchartSSC]
 ) -> tuple[list[StepchartSSC], str]:
-    """ Attempts to match an ArrowEclipseChartInfo to StepChartSSC.
+    """ Attempts to match an ArrowEclipseChartInfo (with level) to StepChartSSC.
+
+        Supports manually-approved multiple matches, such as:
+        - Baroque Virus Full Song D23
+        - Gargoyle Full Song S21
+        In this case, we add 'v1' / 'v2' to the TITLE.
         
         Output
         ------
@@ -65,18 +75,26 @@ def match_aeci_to_ssc(
         if fuzzy_matched_song is None:
             return [], f'failed to fuzzy match song name'
         matched_song_name = fuzzy_matched_song
+
     stepcharts = song_name_to_stepcharts[matched_song_name]
     matched_ssc = [sc for sc in stepcharts if ae_ci.matches_stepchart_ssc_partial(sc)]
-    if len(matched_ssc) > 1 and not allowed_multimatch(ae_ci):
-        return [], f'Unexpectedly matched {len(matched_ssc)} stepcharts in .ssc'
-    return matched_ssc, len(matched_ssc)
+
+    if len(matched_ssc) > 1:
+        if not allowed_multimatch(ae_ci):
+            return [], f'Unexpectedly matched {len(matched_ssc)} stepcharts in .ssc'
+        else:
+            for i, mssc in enumerate(matched_ssc):
+                mssc['TITLE'] += f' v{i+1}'
+
+    return matched_ssc, 'ok'
 
 
 def try_ssc_to_chartstruct(stepchart: StepchartSSC, out_folder: str) -> str:
     basename = make_basename_url_safe(stepchart.shortname() + '.csv')
     out_file = os.path.join(out_folder, basename)
-    # if os.path.isfile(out_file):
-    #     return 'success'
+
+    if os.path.isfile(out_file):
+        return 'skipped because exists'
     # print(basename)
 
     cs_df, holdticks, cs_message = stepchart_ssc_to_chartstruct(stepchart)
@@ -135,15 +153,28 @@ def main():
     """
     matched_sscs = []
     n_matches = defaultdict(int)
+    msg_to_charts = defaultdict(list)
     for ae_ci in tqdm(charts_ae):
         matches, message = match_aeci_to_ssc(ae_ci, song_name_to_stepcharts)
         n_matches[message] += 1
-        if len(matches) == 1:
-            matched_sscs += matches            
+        if message == 'ok':
+            matched_sscs += matches
+        else:
+            msg_to_charts[message].append(ae_ci.shortname())
     for k, v in n_matches.items():
         logger.info(f'{k}: {v}')
     matched_sscs: list[StepchartSSC] = list(set(matched_sscs))
     logger.info(f'Found {len(matched_sscs)} StepchartSSCs matching charts list')
+
+    # save log
+    log_file = '/home/maxwshen/piu-annotate/output/logs/match-ae-to-ssc.yaml'
+    with open(log_file, 'w') as f:
+        yaml.dump(dict(msg_to_charts), f)
+    logger.info(f'Saved log to {log_file}')
+
+    logger.debug('Results from matching AE list to .ssc files:')
+    for k, v in msg_to_charts.items():
+        logger.debug(f'{k}: {v}')
 
     """
         2. Matched .ssc: perform checks if meets standard
@@ -200,11 +231,11 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--charts_list_json', 
-        default = '/home/maxwshen/piu-annotate/data/accessible-stepcharts/072824_phoenix_stepcharts_arroweclipse.json'
+        default = '/home/maxwshen/piu-annotate/artifacts/accessible-stepcharts/122824-arroweclipse.json'
     )
     parser.add_argument(
         '--simfiles_folder', 
-        default = '/home/maxwshen/PIU-Simfiles-rayden-61-072924/'
+        default = '/home/maxwshen/PIU-Simfiles-rayden-61-122824/'
     )
     parser.add_argument(
         '--output_chartstruct_folder', 
