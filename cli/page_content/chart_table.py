@@ -107,9 +107,9 @@ def get_chart_badges() -> dict[str, dict[str, any]]:
         chart_dict['sord'] = sord
         chart_dict['level'] = level
         chart_dict['pack'] = cs.metadata.get('pack', '')
-        chart_dict['songtype'] = cs.metadata.get('SONGTYPE', '')
-        chart_dict['songcategory'] = cs.metadata.get('SONGCATEGORY', '')
-        chart_dict['displaybpm'] = cs.metadata.get('DISPLAYBPM', '')
+        # chart_dict['songtype'] = cs.metadata.get('SONGTYPE', '')
+        # chart_dict['songcategory'] = cs.metadata.get('SONGCATEGORY', '')
+        # chart_dict['displaybpm'] = cs.metadata.get('DISPLAYBPM', '')
 
         # add badges for skills that stepchart is enriched in
         top_chart_skills = get_top_chart_skills(chart_skill_df, cs)
