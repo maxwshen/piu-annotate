@@ -25,6 +25,22 @@ def right_index(items: list[any], query: any) -> int:
     return len(items) - 1 - items[::-1].index(query)
 
 
+def convert_numpy_types(obj):
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(element) for element in obj]
+    elif isinstance(obj, tuple):
+        return tuple([convert_numpy_types(element) for element in obj])
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
 @dataclass
 class ArrowCoordinate:
     row_idx: int
@@ -92,7 +108,7 @@ class ChartStruct:
         return ChartStruct(df, source_file = csv_file)
 
     def to_csv(self, filename: str) -> None:
-        metadata_json = json.dumps(self.metadata)
+        metadata_json = json.dumps(convert_numpy_types(self.metadata))
         if 'Metadata' not in self.df.columns or self.df['Metadata'][0] != metadata_json:
             self.df['Metadata'] = [metadata_json] + ['' for line in range(len(self.df)-1)]
         self.df.to_csv(filename, index = False)

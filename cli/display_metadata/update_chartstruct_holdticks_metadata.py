@@ -51,7 +51,12 @@ def main():
         cs.metadata['sord_chartlevel'] = cs.get_sord_chartlevel()
 
         # update hold tick counts
-        if args.setdefault('holdticks', False) or rerun_all:
+        crits = [
+            rerun_all,
+            args.setdefault('holdticks', True),
+            'Hold ticks' not in cs.metadata,
+        ]
+        if any(crits):
             source_ssc = cs.metadata['ssc_file']
             desc_songtype = cs.metadata['DESCRIPTION'] + '_' + cs.metadata['SONGTYPE']
             stepchart_ssc = StepchartSSC.from_song_ssc_file(source_ssc, desc_songtype)
@@ -59,7 +64,12 @@ def main():
             cs.metadata['Hold ticks'] = holdticks
 
         # annotate effective nps
-        if args.setdefault('enps_annotations', False) or rerun_all:
+        crits = [
+            rerun_all,
+            args.setdefault('enps_annotations', False),
+            'eNPS annotations' not in cs.metadata,
+        ]
+        if any(crits):
             enps_annots = annotate_enps(cs)
             cs.metadata['eNPS annotations'] = enps_annots
 

@@ -69,24 +69,9 @@ def build_segment_feature_store(feature_type: str) -> dict:
         logger.info(f'Building featurized segments for {feature_type=}, serially ...')
         for cs_file in tqdm(chartstruct_files):
             inp_fn = os.path.join(cs_folder, cs_file)
-
-            cs = ChartStruct.from_file(inp_fn)
-            sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
-
-            if feature_type == 'segment':
-                fter = featurizers.DifficultySegmentFeaturizer(cs)
-            else:
-                fter = featurizers.DifficultyStepchartFeaturizer(cs)
-
-            ft_names = fter.get_feature_names()
-            xs = fter.featurize_sections(sections)
-
-            shortname = cs.metadata['shortname']
-            dataset[shortname] = xs
-
-            dataset[f'{shortname}-fullstepchart'] = fter.featurize_full_stepchart()
-
-        dataset['feature names'] = ft_names
+            d = worker(inp_fn, feature_type)
+            for k, v in d.items():
+                dataset[k] = v
 
     # do parallel
     elif do_parallel:
@@ -256,13 +241,14 @@ def train_lgbm(
     return
 
 
-def main():# 
+def main():
     ft_store_segment = build_segment_feature_store(feature_type = 'segment')
     ft_store_stepchart = build_segment_feature_store(feature_type = 'stepchart')
-    dataset = build_dataset(ft_store_segment, ft_store_stepchart)
 
-    for sd in ['singles', 'doubles']:
-        train_lgbm(dataset, sd)
+    if args.setdefault('retrain_model', False):
+        dataset = build_dataset(ft_store_segment, ft_store_stepchart)
+        for sd in ['singles', 'doubles']:
+            train_lgbm(dataset, sd)
 
     logger.success('done')
     return

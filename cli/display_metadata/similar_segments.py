@@ -18,6 +18,8 @@ from piu_annotate.utils import make_basename_url_safe
 def guess_level_from_shortname(shortname: str) -> int:
     """ """
     shortname = shortname.replace('_INFOBAR_TITLE_', '_')
+    shortname = shortname.replace('_INFOBAR_2_', '_')
+    shortname = shortname.replace('_INFOBAR_1_', '_')
     shortname = shortname.replace('_HALFDOUBLE_', '_')
     try:
         return int(shortname.split('_')[-2][1:])
@@ -28,6 +30,8 @@ def guess_level_from_shortname(shortname: str) -> int:
 def guess_sord_from_shortname(shortname: str) -> str:
     """ """
     shortname = shortname.replace('_INFOBAR_TITLE_', '_')
+    shortname = shortname.replace('_INFOBAR_2_', '_')
+    shortname = shortname.replace('_INFOBAR_1_', '_')
     shortname = shortname.replace('_HALFDOUBLE_', '_')
     try:
         return shortname.split('_')[-2][0]

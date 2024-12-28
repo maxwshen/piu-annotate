@@ -151,9 +151,17 @@ def annotate_enps_timeline():
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
 
+    rerun_all = args.setdefault('rerun_all', False)
+    stats = defaultdict(int)
+
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         cs = ChartStruct.from_file(inp_fn)
+
+        if not rerun_all:
+            if 'eNPS timeline data' in cs.metadata:
+                stats['skipped'] += 1
+                continue
 
         # get list of enps
         enps_list = get_enps_list(cs)
@@ -163,6 +171,7 @@ def annotate_enps_timeline():
 
         cs.metadata['eNPS timeline data'] = enps_list
         cs.metadata['eNPS ranges of interest'] = high_enps_ranges
+        stats['annotated'] += 1
 
         if debug:
             import code; code.interact(local=dict(globals(), **locals()))
@@ -170,6 +179,7 @@ def annotate_enps_timeline():
         if not debug:
             cs.to_csv(inp_fn)
 
+    logger.debug(stats)
     return
 
 

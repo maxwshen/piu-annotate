@@ -570,7 +570,7 @@ class Tactician:
                 # filter limb combos to those consistent with previous holds
                 valid_lcs = [lc for lc in limb_combos if limbs_match_holds(lc)]
                 if len(valid_lcs) == 0:
-                    logger.warning(f'Found impossible line with holds with no valid alternate')
+                    logger.warning(f'Found impossible line with holds with no valid alternate. Fix these manually by running `check_hands`')
                     continue
                 
                 n_lines_fixed += 1

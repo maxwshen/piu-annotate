@@ -105,8 +105,8 @@ def get_chart_dict(df: pd.DataFrame, skill: str) -> dict[str, list[str]]:
         Returns dict with keys "S17": list of stepchart shortnames
     """
     sord_to_chartlevels = {
-        'singles': (7, 26),
-        'doubles': (10, 28),
+        'singles': (7, 24),
+        'doubles': (10, 24),
     }
     top_n = 20
 

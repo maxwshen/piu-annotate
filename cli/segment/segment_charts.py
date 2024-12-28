@@ -42,6 +42,8 @@ def main():
         ]
         chartstruct_files = [folder + f for f in chartstruct_files]
 
+    rerun_all = args.setdefault('rerun_all', False)
+
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         try:
@@ -53,10 +55,11 @@ def main():
         # if 'Segments' in cs.metadata:
         #     continue
         # print(cs_file)
-        sections = segmentation(cs, debug = debug)
-        cs.metadata['Segments'] = [s.to_tuple() for s in sections]
-        cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
-        cs.to_csv(inp_fn)
+        if rerun_all or 'Segments' not in cs.metadata:
+            sections = segmentation(cs, debug = debug)
+            cs.metadata['Segments'] = [s.to_tuple() for s in sections]
+            cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
+            cs.to_csv(inp_fn)
 
     logger.success('done')
     return
