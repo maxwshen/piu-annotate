@@ -71,14 +71,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '--chart_struct_csv', 
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/Over_The_Horizon_-_Yamajet_S11_ARCADE.csv',
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/Another_Truth_-_Novasonic_D9_ARCADE.csv'
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/main/Betrayer_-act.2-_-_msgoon_D15_ARCADE.csv'
     )
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/rayden-072924-arroweclipse-072824/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/main/',
     )
     args.parse_args(
         parser, 
-        '/home/maxwshen/piu-annotate/artifacts/models/110424/model-config.yaml'
+        '/home/maxwshen/piu-annotate/artifacts/models/120524/model-config.yaml'
     )
     main()

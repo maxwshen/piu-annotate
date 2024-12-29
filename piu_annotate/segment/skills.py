@@ -454,6 +454,7 @@ def twists_over90(cs: ChartStruct) -> None:
 
 
 def side3_singles(cs: ChartStruct) -> None:
+    cs.annotate_num_downpresses()
     df = cs.df
     lines = cs.get_lines_with_active_holds()
     if notelines.singlesdoubles(lines[0]) != 'singles':

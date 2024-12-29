@@ -5,6 +5,7 @@ from loguru import logger
 from tqdm import tqdm
 from pathlib import Path
 import sys
+from collections import defaultdict
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate import utils
@@ -43,6 +44,7 @@ def main():
         chartstruct_files = [folder + f for f in chartstruct_files]
 
     rerun_all = args.setdefault('rerun_all', False)
+    stats = defaultdict(int)
 
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
@@ -55,12 +57,17 @@ def main():
         # if 'Segments' in cs.metadata:
         #     continue
         # print(cs_file)
-        if rerun_all or 'Segments' not in cs.metadata:
-            sections = segmentation(cs, debug = debug)
-            cs.metadata['Segments'] = [s.to_tuple() for s in sections]
-            cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
-            cs.to_csv(inp_fn)
+        if not rerun_all and 'Segments' in cs.metadata:
+            stats['skipped'] += 1
+            continue
 
+        sections = segmentation(cs, debug = debug)
+        cs.metadata['Segments'] = [s.to_tuple() for s in sections]
+        cs.metadata['Segment metadata'] = [get_segment_metadata(cs, s) for s in sections]
+        stats['segmented'] += 1
+        cs.to_csv(inp_fn)
+
+    logger.debug(stats)
     logger.success('done')
     return
 

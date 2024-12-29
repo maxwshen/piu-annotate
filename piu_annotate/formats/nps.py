@@ -204,7 +204,7 @@ def annotate_enps(cs: ChartStruct) -> tuple[list[float], list[str]]:
     if 'DISPLAYBPM' in cs.metadata:
         if ':' not in cs.metadata['DISPLAYBPM']:
             display_bpm = float(cs.metadata['DISPLAYBPM'])
-            if display_bpm < 0:
+            if display_bpm <= 1:
                 display_bpm = None
 
     # get enps

@@ -36,7 +36,7 @@ def make_data_struct():
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
     ft_store = build_segment_feature_store('stepchart')
-    segment_ft_store = build_segment_feature_store('segment')
+    # segment_ft_store = build_segment_feature_store('segment')
 
     # Load models
     dmp = DifficultyStepchartModelPredictor()

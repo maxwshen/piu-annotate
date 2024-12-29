@@ -24,6 +24,7 @@ def main():
     rerun_all = args.setdefault('rerun_all', False)
     update_metadata_only = args.setdefault('update_metadata_only', False)
     assert not rerun_all or not update_metadata_only, 'only one can be true'
+    logger.info(f'Using {rerun_all=}, {update_metadata_only=}')
 
     for csv in tqdm(csvs):
         basename = make_basename_url_safe(os.path.basename(csv).replace('.csv', '.json'))
