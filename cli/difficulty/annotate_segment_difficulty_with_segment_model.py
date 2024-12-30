@@ -69,7 +69,7 @@ def annotate_segments(dataset: dict):
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
 
-    rerun_all = args.setdefault('rerun_all', False)
+    rerun_all_preds = args.setdefault('rerun_all_preds', False)
     stats = defaultdict(int)
 
     for cs_file in tqdm(chartstruct_files):
@@ -78,7 +78,7 @@ def annotate_segments(dataset: dict):
         sections = [Section.from_tuple(tpl) for tpl in cs.metadata['Segments']]
         shortname = cs.metadata['shortname']
 
-        if not rerun_all:
+        if not rerun_all_preds:
             ds = cs.metadata['Segment metadata']
             if 'level' in ds[0]:
                 # we already predicted section level

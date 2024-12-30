@@ -139,7 +139,7 @@ class Segmenter:
             Places heavier penalty on short sections, so errs 
             towards longer segments.
         """
-        # ~ 1 segment per 15 seconds is roughly good, up to 15 seconds (3.75 min)
+        # ~ 1 segment per 15 seconds is roughly good, up to 15 sections (3.75 min)
         ideal_num_segments = max(15, self.chart_time_len / 15)
         num_cost = (len(changepoints) - ideal_num_segments) ** 2
 
@@ -154,7 +154,7 @@ class Segmenter:
     def segment(self) -> list[Section]:
         # perform initial segmentation
         algo = rpt.KernelCPD(kernel = 'rbf').fit(self.x)
-        penalties = np.linspace(5, 20, 15)
+        penalties = np.linspace(low := 5, high := 25, high - low + 1)
         segments = [algo.predict(pen = p) for p in penalties]
         scores = [self.score(s) for s in segments]
         best_idx = scores.index(max(scores))
@@ -168,18 +168,21 @@ class Segmenter:
                     for i, j in itertools.pairwise(best_segments)]
 
         # try splitting long sections, repeat until convergence
-        while True:
-            new_sections = []
-            for section in sections:
-                if section.time_length() >= 24:
-                    new_sections += self.split(section)
+        if self.cs.metadata['SONGTYPE'] != 'FULLSONG':
+            while True:
+                new_sections = []
+                for section in sections:
+                    if section.time_length() >= 24:
+                        new_sections += self.split(section)
+                    else:
+                        new_sections.append(section)
+                
+                if new_sections != sections:
+                    sections = new_sections
                 else:
-                    new_sections.append(section)
-            
-            if new_sections != sections:
-                sections = new_sections
-            else:
-                break
+                    break
+        else:
+            new_sections = sections
 
         if self.debug:
             print(self.cs.df['Time'].iloc[best_segments[:-1]])

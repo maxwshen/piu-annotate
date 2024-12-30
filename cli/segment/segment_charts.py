@@ -35,9 +35,10 @@ def main():
 
     debug = args.setdefault('debug', False)
     if debug:
-        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/'
+        folder = '/home/maxwshen/piu-annotate/artifacts/chartstructs/main/lgbm-120524/'
         chartstruct_files = [
-            'Gargoyle_-_FULL_SONG_-_-_Sanxion7_D25_FULLSONG.csv',
+            # 'Gargoyle_-_FULL_SONG_-_-_Sanxion7_D25_FULLSONG.csv',
+            'Gargoyle_-_FULL_SONG_-_v1_-_Sanxion7_S21_INFOBAR_TITLE_FULLSONG.csv',
             # 'The_End_of_the_World_ft._Skizzo_-_MonstDeath_D22_ARCADE.csv',
             # 'Altale_-_sakuzyo_D19_ARCADE.csv',
         ]
@@ -54,10 +55,7 @@ def main():
             logger.error(f'Failed to load {inp_fn}')
             sys.exit()
 
-        # if 'Segments' in cs.metadata:
-        #     continue
-        # print(cs_file)
-        if not rerun_all and 'Segments' in cs.metadata:
+        if not debug and not rerun_all and 'Segments' in cs.metadata:
             stats['skipped'] += 1
             continue
 
@@ -78,7 +76,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424/lgbm-110424/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/main/lgbm-120524/',
         # default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/092424',
     )
     parser.add_argument(
