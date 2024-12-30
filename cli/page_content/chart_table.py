@@ -32,9 +32,14 @@ def get_subset_df(
     lower_level: int,
     upper_level: int,
 ) -> float:
-    crit = (chart_skill_df['sord'] == sord) & (chart_skill_df['chart level'] >= lower_level) \
-        & (chart_skill_df['chart level'] <= upper_level)
-    return np.array(chart_skill_df[crit][skill_col])
+    """ Subsets chart_skill_df to charts between `lower_level` and `upper_level`,
+        with `sord`, and returns skill_col values.
+        Can be used to compute the percentile of a query skill mean frequency
+        compared to other stepcharts.
+    """
+    return chart_skill_df.query(
+        "sord == @sord and `chart level`.between(@lower_level, @upper_level)"
+    )[skill_col].to_numpy()
 
 
 def get_top_chart_skills(
