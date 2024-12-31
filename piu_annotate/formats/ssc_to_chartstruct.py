@@ -123,7 +123,8 @@ def stepchart_ssc_to_chartstruct(
     beat = 0
     time = 0
     bpm: float = beat_to_bpm[beat]
-    hold_ticks_per_beat: float = holdticks.get(beat, 4) / BEATS_PER_MEASURE
+    # hold_ticks_per_beat: float = holdticks.get(beat, 4) / BEATS_PER_MEASURE
+    hold_ticks_per_beat: float = holdticks.get(beat, 4)
 
     empty_line = b2l.get_empty_line()
     active_holds = set()
@@ -211,21 +212,26 @@ def stepchart_ssc_to_chartstruct(
             11/4/24 - implementation does not match official youtube chart hold counts,
             but it's close -- not sure why 
         """
+        init_tick_count = 0
         if '3' in line:
             # pop and store current hold tick
             if curr_hold_tick is not None:
                 if curr_hold_tick.ticks > 0 and time != curr_hold_tick.start_time:
+                    if '2' not in line:
+                        # increment tick count when popping, if not starting another hold
+                        curr_hold_tick.ticks += 1
+                        # curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
                     curr_hold_tick.end_time = time
                     hold_tick_list.append(curr_hold_tick)
 
             if len(active_holds) == 0:
                 curr_hold_tick = None
             else:
-                curr_hold_tick = HoldTick(time, -1, 1)
+                curr_hold_tick = HoldTick(time, -1, init_tick_count)
         if '2' in line:
             if curr_hold_tick is None:
                 # init hold tick
-                curr_hold_tick = HoldTick(time, -1, 1)
+                curr_hold_tick = HoldTick(time, -1, init_tick_count)
             else:
                 # pop and store current hold tick
                 if curr_hold_tick.ticks > 0 and time != curr_hold_tick.start_time:
@@ -233,7 +239,7 @@ def stepchart_ssc_to_chartstruct(
                     hold_tick_list.append(curr_hold_tick)
 
                 # reinit hold tick
-                curr_hold_tick = HoldTick(time, -1, 1)
+                curr_hold_tick = HoldTick(time, -1, init_tick_count)
 
 
         # Update time if not in warp
@@ -244,6 +250,7 @@ def stepchart_ssc_to_chartstruct(
             time += delays.get(beat, 0)
 
             if curr_hold_tick is not None:
+                # logger.debug((time, line, beat, beat_increment, hold_ticks_per_beat, curr_hold_tick.ticks))
                 curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
 
     # round holdtick counts
