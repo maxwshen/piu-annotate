@@ -34,7 +34,7 @@ skill_cols_to_description = {
     '__side3 singles': 'Side3 singles describes chart sections that primarily use the side 3 arrows in singles. Twists in these sections are sometimes called corner twists.',
     '__mid6 doubles': 'Mid6 doubles, also known as half-doubles, describes chart sections that primarily use the middle 6 panels in doubles. Strong familiarity with mid6 double patterns are necessary for advancing in doubles beyond a certain level. Half-double patterns can sometimes be the hardest part of learning doubles after learning singles.',
     '__mid4 doubles': 'Mid4 doubles describes chart sections that primarily use the middle 4 panels in doubles. These patterns are typically a challenging barrier for singles players advancing in doubles.',
-    '__doublestep': 'Doublestepping is the act of stepping with the same foot twice in a row, contrasting with the typical flow of alternating feet. Doublestepping is primarily forced in stepcharts by requiring one foot remain on a hold, while the other foot hits multiple arrows in a row.',
+    '__doublestep': 'Doublestepping is stepping with the same foot twice in a row, contrasting with the typical flow of alternating feet. Doublestepping is primarily forced in stepcharts by requiring one foot remain on a hold, while the other foot hits multiple arrows in a row. Unlike jacks where you hit the same panel, doublestepping hits different panels.',
     '__jack': 'Jacks are when you execute a pattern of multiple arrows in a row on the same panel, by using one foot to hit all the arrows. To properly execute jacks, it is important to completely lift your foot off the panel each time, which can be a common mistake at higher speeds. Jacks are related to footswitches, where repeated arrows are instead hit with alternating feet.',
     '__footswitch': 'Footswitches are when you execute a pattern of multiple arrows in a row on the same panel, by alternating feet. These are an alternative to jacks, where the correct choice depends on the chart context. Typically, footswitches are the correct answer with irregular rhythm, or when they avoid a difficult twist forced with jacks.',
     '__bracket': 'A bracket is hitting two arrows with one foot at the same time. Brackets require the two arrows to be physically next to each other on the pad.',
@@ -43,8 +43,14 @@ skill_cols_to_description = {
     '__bracket drill': 'These identify brackets that occur in drills.',
     '__bracket jump': 'Bracket jumps are jumps that involve brackets.',
     '__bracket twist': 'Bracket twists are lines that executed by bracketing and twisting at the same time.',
+    '__5-stair': 'A singles stair pattern where you hit all 5 panels consecutively. You start and end facing the same direction.',
+    '__10-stair': 'A doubles stair pattern where you hit all 10 panels consecutively. Your body twists during the stair, so that you start and end facing different directions.',
+    '__yog walk': 'A doubles cross-pad transition pattern, where the following foot hits the same panels as the leading foot.',
+    '__cross-pad transition': 'A short-distance doubles cross-pad transition pattern which only involves the middle 6 panels: yellow-red-blue-yellow, or yellow-blue-red-yellow.',
+    '__co-op pad transition': 'A doubles cross-pad transition pattern, which either uses all red and yellow arrows; or all blue and yellow arrows. These transitions are common in co-op charts, as they allow the players to pass each other.',
     '__split': 'Splits are a doubles-only pattern that require hitting arrows on the far side panels. These can present a unique challenge to short players.',
     '__hold footswitch': 'A rare pattern that requires switching the foot used on a hold.',
+    '__hold footslide': 'A rare pattern where a foot slides while holding a hold, to tap or press brackets on different panels neighboring the hold.',
     '__hands': 'Rare patterns can require the use of feet and hands together.',
     '__bursty': 'The notes per second in these stepcharts have high variation over time. This is opposite of sustained charts, which have consistent NPS over time.',
     '__sustained': 'The notes per second in these stepcharts have low variation over time. This is opposite of bursty charts.'
@@ -92,8 +98,13 @@ def make_skills_dataframe():
         bursty_score = sum(np.power(enps_data[1:] - enps_data[:-1], 2)) / len(enps_data)
         dd[renamed_skill_cols['__bursty']].append(bursty_score)
         dd[renamed_skill_cols['__sustained']].append(1000 - bursty_score)
+
+        # save annotated skills to file
+        cs.to_csv(inp_fn)
     
     df = pd.DataFrame(dd)
+
+    df = df.drop_duplicates('shortname').reset_index(drop = True)
 
     df.to_csv(dataset_fn, index = False)
     logger.info(f'Saved dataset to {dataset_fn}')
@@ -105,8 +116,8 @@ def get_chart_dict(df: pd.DataFrame, skill: str) -> dict[str, list[str]]:
         Returns dict with keys "S17": list of stepchart shortnames
     """
     sord_to_chartlevels = {
-        'singles': (7, 24),
-        'doubles': (10, 24),
+        'singles': (7, 26),
+        'doubles': (10, 28),
     }
     top_n = 20
 
@@ -140,7 +151,7 @@ def main():
     skill_descriptions = {renamed_skill_cols[k]: v for k, v in
                           skill_cols_to_description.items()}
 
-    # reformat dd into tierlists jsons
+    # reformat dd into json
     output_file = os.path.join(cs_folder, 'page-content', 'stepchart-skills.json')
     utils.make_dir(output_file)
 
@@ -158,7 +169,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/main/lgbm-120524/',
     )
     args.parse_args(parser)
     main()
