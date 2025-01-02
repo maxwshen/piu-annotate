@@ -27,7 +27,7 @@ def notecount(cs: ChartStruct) -> int:
     num_lines_with_1 = sum(['1' in l for l in cs.df['Line']])
 
     total = num_lines_with_1 + total_holdticks
-    logger.debug(holdticks[:6])
+    logger.debug(holdticks[:8])
     logger.debug(len(holdticks))
     return total
 
@@ -41,9 +41,9 @@ def annotate_segment_similarity():
     debug = args.setdefault('debug', False)
     if debug:
         chartstruct_files = [
-            # 'GLORIA_-_Croire_D21_ARCADE.csv',
             'Doppelganger_-_MonstDeath_D26_ARCADE.csv',
             'Nyan-turne_(feat._KuTiNA)_-_Cashew__Castellia_D21_ARCADE.csv',
+            # 'GLORIA_-_Croire_D21_ARCADE.csv',
             # 'Final_Audition_2__-_SHORT_CUT_-_-_Banya_S17_SHORTCUT.csv',
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
@@ -54,6 +54,8 @@ def annotate_segment_similarity():
 
         count = notecount(cs)
         logger.debug((cs.metadata['shortname'], count))
+        if debug:
+            import code; code.interact(local=dict(globals(), **locals()))
 
     return
 

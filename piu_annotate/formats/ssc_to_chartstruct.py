@@ -217,11 +217,14 @@ def stepchart_ssc_to_chartstruct(
                 if curr_hold_tick.ticks >= 0 and time != curr_hold_tick.start_time:
                     if '2' not in line:
                         # increment tick count when popping, if not starting another hold
+                        # curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
                         # if '1' in line:
                             # curr_hold_tick.ticks -= 1
-                        # if '1' not in line:
+                        if hold_ticks_per_beat > 0:
+                            curr_hold_tick.ticks += 1
+                        if '1' in line:
+                            curr_hold_tick.ticks = max(0, curr_hold_tick.ticks - 1)
                             # curr_hold_tick.ticks += 1
-                            # curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
                         pass
                     curr_hold_tick.end_time = time
                     hold_tick_list.append(curr_hold_tick)
@@ -243,6 +246,7 @@ def stepchart_ssc_to_chartstruct(
                 # reinit hold tick
                 curr_hold_tick = HoldTick(time, -1, init_tick_count)
 
+        # logger.debug((time, line, beat, hold_ticks_per_beat, curr_hold_tick))
 
         # Update time if not in warp
         beat_increment = next_beat - beat
@@ -252,10 +256,14 @@ def stepchart_ssc_to_chartstruct(
             time += delays.get(beat, 0)
 
             if curr_hold_tick is not None:
-                # logger.debug((time, line, beat, beat_increment, hold_ticks_per_beat, curr_hold_tick.ticks))
+                # logger.debug((curr_hold_tick.ticks, hold_ticks_per_beat * beat_increment))
                 curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
-                # if '1' in line:
-                    # curr_hold_tick.ticks -= 1
+                if '1' in line:
+                    curr_hold_tick.ticks = max(0, curr_hold_tick.ticks - 1)
+
+        # if time > 8.3:
+        #     import sys
+        #     sys.exit()
 
     # round holdtick counts
     for ht in hold_tick_list:
