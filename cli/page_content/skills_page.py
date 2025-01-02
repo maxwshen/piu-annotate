@@ -46,7 +46,7 @@ skill_cols_to_description = {
     '__5-stair': 'A singles stair pattern where you hit all 5 panels consecutively. You start and end facing the same direction.',
     '__10-stair': 'A doubles stair pattern where you hit all 10 panels consecutively. Your body twists during the stair, so that you start and end facing different directions.',
     '__yog walk': 'A doubles cross-pad transition pattern, where the following foot hits the same panels as the leading foot.',
-    '__mid6 pad transition': 'A short-distance doubles cross-pad transition pattern which only involves the middle 6 panels: yellow-red-blue-yellow, or yellow-blue-red-yellow.',
+    '__cross-pad transition': 'A short-distance doubles cross-pad transition pattern which only involves the middle 6 panels: yellow-red-blue-yellow, or yellow-blue-red-yellow.',
     '__co-op pad transition': 'A doubles cross-pad transition pattern, which either uses all red and yellow arrows; or all blue and yellow arrows. These transitions are common in co-op charts, as they allow the players to pass each other.',
     '__split': 'Splits are a doubles-only pattern that require hitting arrows on the far side panels. These can present a unique challenge to short players.',
     '__hold footswitch': 'A rare pattern that requires switching the foot used on a hold.',
@@ -98,6 +98,9 @@ def make_skills_dataframe():
         bursty_score = sum(np.power(enps_data[1:] - enps_data[:-1], 2)) / len(enps_data)
         dd[renamed_skill_cols['__bursty']].append(bursty_score)
         dd[renamed_skill_cols['__sustained']].append(1000 - bursty_score)
+
+        # save annotated skills to file
+        cs.to_csv(inp_fn)
     
     df = pd.DataFrame(dd)
 

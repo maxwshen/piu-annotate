@@ -104,9 +104,9 @@ def get_chart_badges() -> dict[str, dict[str, any]]:
     debug = args.setdefault('debug', False)
     if debug:
         chartstruct_files = [
-            'Can-can_Orpheus_in_The_Party_Mix_-_SHORT_CUT_-_-_Sr._Lan_Belmont_D25_SHORTCUT.csv',
             'Clematis_Rapsodia_-_Jehezukiel_D23_ARCADE.csv',
             'PaPa_Gonzales_-_BanYa_S22_ARCADE.csv',
+            'Can-can_Orpheus_in_The_Party_Mix_-_SHORT_CUT_-_-_Sr._Lan_Belmont_D25_SHORTCUT.csv',
             # 'Good_Night_-_Dreamcatcher_D22_ARCADE.csv',
             # 'After_LIKE_-_IVE_D20_ARCADE.csv',
         ]
@@ -152,6 +152,10 @@ def get_chart_badges() -> dict[str, dict[str, any]]:
             # use display bpm if available
             bpm, notetype = calc_bpm(1 / nps, float(display_bpm))
             notetype_bpm_info = f'{notetype} @ {round(bpm)} bpm'
+            if bpm > float(display_bpm) * 1.05:
+                notetype_bpm_info = f'>{notetype} @ {round(float(display_bpm))} bpm'
+            elif bpm < float(display_bpm) * 0.95:
+                notetype_bpm_info = f'<{notetype} @ {round(float(display_bpm))} bpm'
         else:
             notetype_bpm_info = get_notetype_and_bpm_info(nps)
 

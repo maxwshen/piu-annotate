@@ -118,20 +118,26 @@ class SegmentSimilarity:
         j = 0
         found_sections = []
         found_names = set()
+        found_urlsafe_names = set()
         while len(found_sections) < num_closest and j < len(closest_idxs):
             found_idx = closest_idxs[j]
             found_section = sections[found_idx]
             found_name = found_section[0]
+            url_safe_name = make_basename_url_safe(found_name)
             crits = [
                 self.shortname_to_level[found_name] <= query_level + level_threshold,
                 self.shortname_to_sord[found_name] == query_sord,
                 found_name != shortname,
                 found_name not in found_names,
+                url_safe_name != make_basename_url_safe(shortname),
+                url_safe_name not in found_urlsafe_names,
             ]
             if all(crits):
                 # logger.debug(found_section, '--', f'{dists[found_idx]:.2f}')
+                # logger.debug((found_name, found_names))
                 found_sections.append(found_section)
                 found_names.add(found_name)
+                found_urlsafe_names.add(url_safe_name)
             j += 1
 
         return found_sections
@@ -148,8 +154,9 @@ def annotate_segment_similarity():
     debug = args.setdefault('debug', False)
     if debug:
         chartstruct_files = [
+            'VECTOR_-_Zekk_D24_ARCADE.csv',
             # 'GLORIA_-_Croire_D21_ARCADE.csv',
-            'Final_Audition_2__-_SHORT_CUT_-_-_Banya_S17_SHORTCUT.csv',
+            # 'Final_Audition_2__-_SHORT_CUT_-_-_Banya_S17_SHORTCUT.csv',
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
 

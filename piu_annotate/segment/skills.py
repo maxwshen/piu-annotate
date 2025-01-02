@@ -834,12 +834,12 @@ def stair5(cs: ChartStruct) -> None:
     return
 
 
-def mid6_pad_transition(cs: ChartStruct) -> None:
+def cross_pad_transition(cs: ChartStruct) -> None:
     df = cs.df
     lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
     limb_annots = list(df['Limb annotation'])
 
-    col = '__mid6 pad transition'
+    col = '__cross-pad transition'
     if cs.singles_or_doubles() == 'singles':
         cs.df[col] = [False] * len(cs.df)
         return
@@ -1040,7 +1040,7 @@ def annotate_skills(cs: ChartStruct) -> None:
     stair5(cs)
     stair10(cs)
     yogwalk(cs)
-    mid6_pad_transition(cs)
+    cross_pad_transition(cs)
     coop_pad_transition(cs)
     hold_footslide(cs)
 

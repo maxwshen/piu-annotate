@@ -46,7 +46,8 @@ def annotate_segment_similarity():
         chart_level = cs.get_chart_level()
         sord = cs.singles_or_doubles()
 
-        annotate_skills(cs)
+        # should not need to be rerun after skills_page.py
+        # annotate_skills(cs)
 
         lower_level = min(chart_level - 1, 24)
         upper_level = chart_level
@@ -62,7 +63,13 @@ def annotate_segment_similarity():
 
             # annotate skills already called to create skills_df
             if eligible_skill_cols is None:
+                # find skills in df - ignores chart-wide skills like bursty/sustained
                 eligible_skill_cols = [col for col in skill_cols if col in dfs.columns]
+                
+                # disallow `run without twists`
+                disallowed = ['__run without twists']
+                for col in disallowed:
+                    eligible_skill_cols.remove(col)
 
             skill_fq_dfs = dfs[eligible_skill_cols].mean(axis = 0)
 
