@@ -23,27 +23,37 @@ from piu_annotate.formats.nps import calc_bpm
 from cli.page_content.skills_page import skill_cols, renamed_skill_cols, make_skills_dataframe
 from cli.page_content.tierlists import get_notetype_and_bpm_info
 
-chart_skill_df = None
 
-@functools.lru_cache
-def get_subset_df(
-    skill_col: str, 
-    sord: str,
-    lower_level: int,
-    upper_level: int,
-) -> float:
-    """ Subsets chart_skill_df to charts between `lower_level` and `upper_level`,
-        with `sord`, and returns skill_col values.
-        Can be used to compute the percentile of a query skill mean frequency
-        compared to other stepcharts.
-    """
-    return chart_skill_df.query(
-        "sord == @sord and `chart level`.between(@lower_level, @upper_level)"
-    )[skill_col].to_numpy()
+class SkillComparer:
+    def __init__(self, chart_skill_df: pd.DataFrame):
+        """ Stores `chart_skill_df`, and slices of it """
+        self.df = chart_skill_df
+        self.shortnames = list(self.df['shortname'])
+        self.store = dict()    
+
+    def get_values(self, skill_col: str, sord: str, lower_level: int, upper_level: int):
+        """ Subsets chart_skill_df to charts between `lower_level` and `upper_level`,
+            with `sord`, and returns skill_col values.
+            Can be used to compute the percentile of a query skill mean frequency
+            compared to other stepcharts.
+        """
+        key = (skill_col, sord, lower_level, upper_level)
+        if key in self.store:
+            return self.store[key]
+        
+        values = self.df.query(
+            "sord == @sord and `chart level`.between(@lower_level, @upper_level)"
+        )[skill_col].to_numpy()
+        self.store[key] = values
+        return values
+    
+    def get_value_for_chart(self, name: str, skill: str):
+        return self.df.at[self.shortnames.index(name), skill]
 
 
 def get_top_chart_skills(
     chart_skill_df: pd.DataFrame, 
+    skill_comparer: SkillComparer,
     cs: ChartStruct,
 ) -> list[str]:
     """ Gets the most distinguishing skills for stepchart `cs`, compared to
@@ -54,8 +64,8 @@ def get_top_chart_skills(
     level = cs.get_chart_level()
     skill_to_pcts = {}
     for skill in list(renamed_skill_cols.values()):
-        data = get_subset_df(skill, sord, min(level - 1, 24), level)
-        val = chart_skill_df.loc[chart_skill_df['shortname'] == name, skill].iloc[0]
+        data = skill_comparer.get_values(skill, sord, min(level - 1, 24), level)
+        val = skill_comparer.get_value_for_chart(name, skill)
         percentile = sum(val > data) / len(data)
         skill_to_pcts[skill] = percentile
 
@@ -83,19 +93,22 @@ def get_chart_badges() -> dict[str, dict[str, any]]:
         - eNPS
         - run length (time under tension)
     """
-    global chart_skill_df
     chart_skill_df = make_skills_dataframe()
+    skill_comparer = SkillComparer(chart_skill_df)
 
     cs_folder = args['chart_struct_csv_folder']
     logger.info(f'Using {cs_folder=}')
     chartstruct_files = [fn for fn in os.listdir(cs_folder) if fn.endswith('.csv')]
     logger.info(f'Found {len(chartstruct_files)} ChartStruct CSVs ...')
 
-    if args.setdefault('debug', False):
+    debug = args.setdefault('debug', False)
+    if debug:
         chartstruct_files = [
-            'Good_Night_-_Dreamcatcher_D22_ARCADE.csv',
+            'Can-can_Orpheus_in_The_Party_Mix_-_SHORT_CUT_-_-_Sr._Lan_Belmont_D25_SHORTCUT.csv',
             'Clematis_Rapsodia_-_Jehezukiel_D23_ARCADE.csv',
-            'After_LIKE_-_IVE_D20_ARCADE.csv',
+            'PaPa_Gonzales_-_BanYa_S22_ARCADE.csv',
+            # 'Good_Night_-_Dreamcatcher_D22_ARCADE.csv',
+            # 'After_LIKE_-_IVE_D20_ARCADE.csv',
         ]
 
     all_chart_dicts = []
@@ -117,8 +130,11 @@ def get_chart_badges() -> dict[str, dict[str, any]]:
         # chart_dict['displaybpm'] = cs.metadata.get('DISPLAYBPM', '')
 
         # add badges for skills that stepchart is enriched in
-        top_chart_skills = get_top_chart_skills(chart_skill_df, cs)
+        top_chart_skills = get_top_chart_skills(chart_skill_df, skill_comparer, cs)
         chart_dict['skills'] = top_chart_skills
+        if debug:
+            logger.debug('Debugging top chart skills ...')
+            import code; code.interact(local=dict(globals(), **locals()))
 
         # add badges for skill warnings in segments
         # for section, section_dict in cs.metadata['Segment metadata'].items():
@@ -184,7 +200,7 @@ if __name__ == '__main__':
     """)
     parser.add_argument(
         '--chart_struct_csv_folder', 
-        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/120524/lgbm-120524/',
+        default = '/home/maxwshen/piu-annotate/artifacts/chartstructs/main/lgbm-120524/',
     )
     args.parse_args(parser)
     main()

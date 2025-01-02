@@ -6,6 +6,7 @@ import re
 import itertools
 from loguru import logger
 import pandas as pd
+import numpy as np
 
 from hackerargs import args
 from piu_annotate.formats.chart import ChartStruct
@@ -454,8 +455,12 @@ def twists_over90(cs: ChartStruct) -> None:
 
 
 def side3_singles(cs: ChartStruct) -> None:
-    cs.annotate_num_downpresses()
     df = cs.df
+    if cs.singles_or_doubles() == 'doubles':
+        cs.df['__side3 singles'] = [False] * len(cs.df)
+        return
+
+    cs.annotate_num_downpresses()
     lines = cs.get_lines_with_active_holds()
     if notelines.singlesdoubles(lines[0]) != 'singles':
         cs.df['__side3 singles'] = [False] * len(df)
@@ -561,7 +566,6 @@ def jack(cs: ChartStruct) -> None:
     lines = cs.get_lines_with_active_holds()
     limb_annots = list(df['Limb annotation'])
     ts = list(df['__time since prev downpress'])
-    min_nps = 8
 
     res = [False]
     for i, j in itertools.pairwise(range(len(df))):
@@ -601,6 +605,340 @@ def hold_footswitch(cs: ChartStruct) -> None:
     limb_annots = list(df['Limb annotation'])
 
     cs.df['__hold footswitch'] = ['e' in la for line, la in zip(lines, limb_annots)]
+    return
+
+
+def hold_footslide(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = cs.get_lines_with_active_holds()
+    limb_annots = list(df['Limb annotation'])
+    vals = np.array([False] * len(df))
+
+    def get_panel_downpresses_with_limb(line_ah: str, limb_annot: str, limb: str):
+        panels = []
+        for panel, action in notelines.panel_idx_to_action(line).items():
+            if action in ['1', '2', '4']:
+                l = notelines.get_limb_for_arrow_pos(line_ah, limb_annot, panel)
+                if l == limb:
+                    panels.append(panel)
+        return panels
+    
+    def get_hold_start_idx(panel: int, hold_end_idx: int):
+        for i, l in enumerate(lines[:hold_end_idx][::-1]):
+            if l[panel] == '2':
+                return hold_end_idx - i
+        assert False
+
+    active_holds = dict()
+    for idx, line in enumerate(lines):
+        limb_annot = limb_annots[idx]
+        for panel, action in notelines.panel_idx_to_action(line).items():
+            if action == '2':
+                limb = notelines.get_limb_for_arrow_pos(line, limb_annot, panel)
+
+                # get all panel downpresses with limb
+
+                active_holds[(panel, limb)] = get_panel_downpresses_with_limb(
+                    line, limb_annot, limb
+                )
+            
+            elif action == '4':
+                possible_keys = [(panel, 'l'), (panel, 'r')]
+                keys = [k for k in possible_keys if k in active_holds]
+                if len(keys) > 0:
+                    key = keys[0]
+                    limb = key[1]
+
+                    dp_panels = get_panel_downpresses_with_limb(
+                        line, limb_annot, limb
+                    )
+                    for dp_panel in dp_panels:
+                        if dp_panel not in active_holds[key]:
+                            active_holds[key].append(dp_panel)
+            
+            elif action == '3':
+                possible_keys = [(panel, 'l'), (panel, 'r')]
+                keys = [k for k in possible_keys if k in active_holds]
+                if len(keys) > 0:
+                    key = keys[0]
+                    limb = key[1]
+
+                    dp_panels_during_hold = active_holds.pop(key)
+                    if len(set(dp_panels_during_hold)) >= 3:
+                        start_idx = get_hold_start_idx(panel, idx)
+                        vals[start_idx : idx + 1] = True
+        
+    cs.df['__hold footslide'] = vals
+    return
+
+
+def stair10(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
+
+    col = '__10-stair'
+    if cs.singles_or_doubles() == 'singles':
+        cs.df[col] = [False] * len(cs.df)
+        return
+
+    lines_w_downpress = [line for idx, line in enumerate(lines)
+                        if notelines.has_downpress(line)]
+    line_idxs = [idx for idx, line in enumerate(lines)
+                 if notelines.has_downpress(line)]
+    
+    patterns = [
+        [
+            '1000000000',
+            '0100000000',
+            '0010000000',
+            '0001000000',
+            '0000100000',
+            '0000010000',
+            '0000001000',
+            '0000000100',
+            '0000000010',
+            '0000000001',
+        ]
+    ]
+    flipped_patterns = []
+    for p in patterns:
+        flipped_patterns.append(p[::-1])
+    patterns += flipped_patterns
+
+    vals = np.array([False] * len(cs.df))
+
+    # match patterns
+    for pattern in patterns:
+        for start in range(0, len(lines_w_downpress) - len(pattern)):
+            end = start + len(pattern)
+            # allow matching 2 as 1
+            dp_lines = [l.replace('2', '1') for l in lines_w_downpress[start : end]]
+
+            if all(l == pl for l, pl in zip(dp_lines, pattern)):
+                vals[line_idxs[start : end]] = True
+
+    cs.df[col] = vals
+    return
+
+
+def yogwalk(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
+
+    col = '__yog walk'
+    if cs.singles_or_doubles() == 'singles':
+        cs.df[col] = [False] * len(cs.df)
+        return
+
+    lines_w_downpress = [line for idx, line in enumerate(lines)
+                        if notelines.has_downpress(line)]
+    line_idxs = [idx for idx, line in enumerate(lines)
+                 if notelines.has_downpress(line)]
+    
+    patterns = [
+        [
+            '0010000000',
+            '0100000000',
+            '0001000000',
+            '0010000000',
+            '0000100000',
+            '0001000000',
+            '0000010000',
+            '0000100000',
+            '0000001000',
+            '0000010000',
+            '0000000100',
+            '0000001000',
+            '0000000010',
+            '0000000100',
+        ],
+        [
+            '0010000000',
+            '0100000000',
+            '0000100000',
+            '0010000000',
+            '0001000000',
+            '0000100000',
+            '0000001000',
+            '0001000000',
+            '0000010000',
+            '0000001000',
+            '0000000100',
+            '0000010000',
+            '0000000010',
+            '0000000100',
+        ],
+    ]
+    flipped_patterns = []
+    for p in patterns:
+        flipped_patterns.append(p[::-1])
+    patterns += flipped_patterns
+
+    vals = np.array([False] * len(cs.df))
+
+    # match patterns
+    for pattern in patterns:
+        for start in range(0, len(lines_w_downpress) - len(pattern)):
+            end = start + len(pattern)
+            # allow matching 2 as 1
+            dp_lines = [l.replace('2', '1') for l in lines_w_downpress[start : end]]
+
+            if all(l == pl for l, pl in zip(dp_lines, pattern)):
+                vals[line_idxs[start : end]] = True
+
+    cs.df[col] = vals
+    return
+
+
+def stair5(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
+
+    col = '__5-stair'
+    if cs.singles_or_doubles() == 'doubles':
+        cs.df[col] = [False] * len(cs.df)
+        return
+
+    lines_w_downpress = [line for idx, line in enumerate(lines)
+                        if notelines.has_downpress(line)]
+    line_idxs = [idx for idx, line in enumerate(lines)
+                 if notelines.has_downpress(line)]
+    
+    patterns = [
+        [
+            '10000',
+            '01000',
+            '00100',
+            '00010',
+            '00001',
+        ],
+    ]
+    flipped_patterns = []
+    for p in patterns:
+        flipped_patterns.append(p[::-1])
+    patterns += flipped_patterns
+
+    vals = np.array([False] * len(cs.df))
+
+    # match patterns
+    for pattern in patterns:
+        for start in range(0, len(lines_w_downpress) - len(pattern)):
+            end = start + len(pattern)
+            # allow matching 2 as 1
+            dp_lines = [l.replace('2', '1') for l in lines_w_downpress[start : end]]
+
+            if all(l == pl for l, pl in zip(dp_lines, pattern)):
+                vals[line_idxs[start : end]] = True
+
+    cs.df[col] = vals
+    return
+
+
+def mid6_pad_transition(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
+    limb_annots = list(df['Limb annotation'])
+
+    col = '__mid6 pad transition'
+    if cs.singles_or_doubles() == 'singles':
+        cs.df[col] = [False] * len(cs.df)
+        return
+
+    lines_w_downpress = [line for idx, line in enumerate(lines)
+                        if notelines.has_downpress(line)]
+    line_idxs = [idx for idx, line in enumerate(lines)
+                 if notelines.has_downpress(line)]
+    
+    patterns = [
+        [
+            '0010000000',
+            '0001000000',
+            '0000010000',
+            '0000000100',
+        ],
+        [
+            '0010000000',
+            '0000100000',
+            '0000001000',
+            '0000000100',
+        ],
+    ]
+    flipped_patterns = []
+    for p in patterns:
+        flipped_patterns.append(p[::-1])
+    patterns += flipped_patterns
+
+    vals = np.array([False] * len(cs.df))
+
+    # match patterns
+    for pattern in patterns:
+        for start in range(0, len(lines_w_downpress) - len(pattern)):
+            end = start + len(pattern)
+            # allow matching 2 as 1
+            dp_lines = [l.replace('2', '1') for l in lines_w_downpress[start : end]]
+            idxs = line_idxs[start:end]
+            limbs = [limb_annots[i] for i in idxs]
+
+            matches_pattern = all(l == pl for l, pl in zip(dp_lines, pattern))
+            alternates = all([l1 != l2 for l1, l2 in itertools.pairwise(limbs)])
+
+            if matches_pattern and alternates:
+                vals[line_idxs[start : end]] = True
+
+    cs.df[col] = vals
+    return
+
+
+def coop_pad_transition(cs: ChartStruct) -> None:
+    df = cs.df
+    lines = list(df['Line with active holds'].apply(lambda l: l.replace('`', '')))
+
+    col = '__co-op pad transition'
+    if cs.singles_or_doubles() == 'singles':
+        cs.df[col] = [False] * len(cs.df)
+        return
+
+    lines_w_downpress = [line for idx, line in enumerate(lines)
+                        if notelines.has_downpress(line)]
+    line_idxs = [idx for idx, line in enumerate(lines)
+                 if notelines.has_downpress(line)]
+    
+    patterns = [
+        [
+            '1000000000',
+            '0010000000',
+            '0000100000',
+            '0000010000',
+            '0000000100',
+            '0000000001',
+        ],
+        [
+            '0100000000',
+            '0010000000',
+            '0001000000',
+            '0000001000',
+            '0000000100',
+            '0000000010',
+        ],
+    ]
+    flipped_patterns = []
+    for p in patterns:
+        flipped_patterns.append(p[::-1])
+    patterns += flipped_patterns
+
+    vals = np.array([False] * len(cs.df))
+
+    # match patterns
+    for pattern in patterns:
+        for start in range(0, len(lines_w_downpress) - len(pattern)):
+            end = start + len(pattern)
+            # allow matching 2 as 1
+            dp_lines = [l.replace('2', '1') for l in lines_w_downpress[start : end]]
+
+            if all(l == pl for l, pl in zip(dp_lines, pattern)):
+                vals[line_idxs[start : end]] = True
+
+    cs.df[col] = vals
     return
 
 
@@ -698,6 +1036,13 @@ def annotate_skills(cs: ChartStruct) -> None:
     jump(cs)
     twists_90(cs)
     twists_over90(cs)
+
+    stair5(cs)
+    stair10(cs)
+    yogwalk(cs)
+    mid6_pad_transition(cs)
+    coop_pad_transition(cs)
+    hold_footslide(cs)
 
     # compound skills
     cs.df['__bracket run'] = cs.df['__bracket'] & cs.df['__run']
