@@ -123,14 +123,12 @@ def stepchart_ssc_to_chartstruct(
     beat = 0
     time = 0
     bpm: float = beat_to_bpm[beat]
-    # hold_ticks_per_beat: float = holdticks.get(beat, 4) / BEATS_PER_MEASURE
-    hold_ticks_per_beat: float = holdticks.get(beat, 4)
+    hold_ticks_per_beat: float = holdticks.get(beat, 1)
 
     empty_line = b2l.get_empty_line()
     active_holds = set()
     hold_tick_list: list[HoldTick] = []
     curr_hold_tick = None
-    num_bad_lines = 0
     dd = defaultdict(list)
     for beat_idx, beat in enumerate(beats):
         """ Iterate over beats where things happen, incrementing time based on bpm.
@@ -216,11 +214,15 @@ def stepchart_ssc_to_chartstruct(
         if '3' in line:
             # pop and store current hold tick
             if curr_hold_tick is not None:
-                if curr_hold_tick.ticks > 0 and time != curr_hold_tick.start_time:
+                if curr_hold_tick.ticks >= 0 and time != curr_hold_tick.start_time:
                     if '2' not in line:
                         # increment tick count when popping, if not starting another hold
-                        curr_hold_tick.ticks += 1
-                        # curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
+                        # if '1' in line:
+                            # curr_hold_tick.ticks -= 1
+                        # if '1' not in line:
+                            # curr_hold_tick.ticks += 1
+                            # curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
+                        pass
                     curr_hold_tick.end_time = time
                     hold_tick_list.append(curr_hold_tick)
 
@@ -234,7 +236,7 @@ def stepchart_ssc_to_chartstruct(
                 curr_hold_tick = HoldTick(time, -1, init_tick_count)
             else:
                 # pop and store current hold tick
-                if curr_hold_tick.ticks > 0 and time != curr_hold_tick.start_time:
+                if curr_hold_tick.ticks >= 0 and time != curr_hold_tick.start_time:
                     curr_hold_tick.end_time = time
                     hold_tick_list.append(curr_hold_tick)
 
@@ -252,10 +254,14 @@ def stepchart_ssc_to_chartstruct(
             if curr_hold_tick is not None:
                 # logger.debug((time, line, beat, beat_increment, hold_ticks_per_beat, curr_hold_tick.ticks))
                 curr_hold_tick.ticks += hold_ticks_per_beat * beat_increment
+                # if '1' in line:
+                    # curr_hold_tick.ticks -= 1
 
     # round holdtick counts
     for ht in hold_tick_list:
         ht.ticks = round(ht.ticks)
+        if ht.ticks < 0:
+            logger.debug(('Found hold with negative ticks', ht))
 
     df = pd.DataFrame(dd)
     df = combine_lines_very_close_in_time(df)

@@ -23,9 +23,11 @@ def notecount(cs: ChartStruct) -> int:
 
     total_holdticks = sum([ht[2] for ht in holdticks])
 
-    num_lines_with_1 = sum(['1' in l and '3' not in l for l in cs.df['Line']])
+    # num_lines_with_1 = sum(['1' in l and '3' not in l for l in cs.df['Line']])
+    num_lines_with_1 = sum(['1' in l for l in cs.df['Line']])
 
     total = num_lines_with_1 + total_holdticks
+    logger.debug(holdticks[:6])
     logger.debug(len(holdticks))
     return total
 
