@@ -6,6 +6,8 @@ from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 import sys
+from collections import defaultdict
+import pandas as pd
 
 from piu_annotate.formats.chart import ChartStruct
 from piu_annotate.formats.sscfile import StepchartSSC, SongSSC
@@ -27,8 +29,10 @@ def notecount(cs: ChartStruct) -> int:
     num_lines_with_1 = sum(['1' in l for l in cs.df['Line']])
 
     total = num_lines_with_1 + total_holdticks
-    logger.debug(holdticks[:8])
-    logger.debug(len(holdticks))
+    debug = args.setdefault('debug', False)
+    if debug:
+        logger.debug(holdticks[:8])
+        logger.debug(len(holdticks))
     return total
 
 
@@ -48,15 +52,27 @@ def annotate_segment_similarity():
         ]
         chartstruct_files = [os.path.join(cs_folder, f) for f in chartstruct_files]
 
+    dd = defaultdict(list)
     for cs_file in tqdm(chartstruct_files):
         inp_fn = os.path.join(cs_folder, cs_file)
         cs = ChartStruct.from_file(inp_fn)
 
         count = notecount(cs)
-        logger.debug((cs.metadata['shortname'], count))
         if debug:
+            logger.debug((cs.metadata['shortname'], count))
             import code; code.interact(local=dict(globals(), **locals()))
 
+        dd['Shortname (piucenter)'].append(cs.metadata['shortname'])
+        dd['Song'].append(cs.metadata['TITLE'])
+        dd['Type'].append(cs.singles_or_doubles())
+        dd['Level'].append(cs.metadata['METER'])
+        dd['Note Count'].append(count)
+        dd['Pack'].append(cs.metadata['pack'])
+
+    out_fn = '/home/maxwshen/piu-annotate/artifacts/notecounts/notecounts.csv'
+    df = pd.DataFrame(dd)
+    df.to_csv(out_fn)
+    logger.info(f'Wrote to {out_fn}')
     return
 
 
